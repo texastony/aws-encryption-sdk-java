@@ -310,13 +310,13 @@ public final class CipherBlockHeaders {
         int parsedBytes = 0;
         try {
             if (nonceLength_ > 0 && nonce_ == null) {
-                parsedBytes += parseNonce(b, off + parsedBytes);    
+                parsedBytes += parseNonce(b, off + parsedBytes);
             }
-            
+
             if (contentLength_ < 0) {
                 parsedBytes += parseContentLength(b, off + parsedBytes);
             }
-            
+
             isComplete_ = true;
         } catch (ParseException e) {
             // this results when we do partial parsing and there aren't enough

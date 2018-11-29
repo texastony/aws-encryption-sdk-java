@@ -18,12 +18,15 @@ import java.util.Base64;
 
 import com.amazonaws.encryptionsdk.CryptoAlgorithm;
 
+import static com.amazonaws.encryptionsdk.internal.BouncyCastleConfiguration.INTERNAL_BOUNCY_CASTLE_PROVIDER;
+
 /**
  * Provides a consistent interface across various trailing signature algorithms.
  *
  * NOTE: This is not a stable API and may undergo breaking changes in the future.
  */
 public abstract class TrailingSignatureAlgorithm {
+
     private TrailingSignatureAlgorithm() {
         /* Do not allow arbitrary subclasses */
     }
@@ -84,7 +87,7 @@ public abstract class TrailingSignatureAlgorithm {
 
         @Override
         public KeyPair generateKey() throws GeneralSecurityException {
-            KeyPairGenerator keyGen = KeyPairGenerator.getInstance("ECDSA", "BC");
+            KeyPairGenerator keyGen = KeyPairGenerator.getInstance("ECDSA", INTERNAL_BOUNCY_CASTLE_PROVIDER);
             keyGen.initialize(ecSpec, Utils.getSecureRandom());
 
             return keyGen.generateKeyPair();

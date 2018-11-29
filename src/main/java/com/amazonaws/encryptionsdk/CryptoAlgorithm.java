@@ -16,7 +16,6 @@ package com.amazonaws.encryptionsdk;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.InvalidKeyException;
-import java.security.Provider;
 import java.security.Security;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -25,6 +24,7 @@ import java.util.Map;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.amazonaws.encryptionsdk.internal.BouncyCastleConfiguration;
 import org.bouncycastle.crypto.Digest;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.digests.SHA384Digest;
@@ -33,6 +33,7 @@ import org.bouncycastle.crypto.params.HKDFParameters;
 
 import com.amazonaws.encryptionsdk.internal.Constants;
 import com.amazonaws.encryptionsdk.model.CiphertextHeaders;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
  * Describes the cryptographic algorithms available for use in this library.
@@ -103,14 +104,12 @@ public enum CryptoAlgorithm {
     private final int dataKeyLen_;
     private final boolean safeToCache_;
 
+    /**
+     * This block is used to ensure static blocks of BouncyCastleConfiguration are evaluated as a dependency of
+     * the CryptoAlgorithm class
+     */
     static {
-        try {
-            Security.addProvider((Provider)
-                    Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider").newInstance());
-        } catch (final Throwable ex) {
-            // Swallow this error. We'll either succeed or fail later with reasonable
-            // stacktraces.
-        }
+        BouncyCastleConfiguration.init();
     }
 
     /*

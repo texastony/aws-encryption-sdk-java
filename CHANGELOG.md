@@ -3,8 +3,12 @@
 ## 1.3.6
 
 ### Minor Changes
-
-(nothing yet)
+* Fixed typos in Exception messages (excryption -> encryption) #78
+* Fixed DecryptionMaterialsRequest.Builder to copy EncryptionContext #77
+* JML Specifications for CipherBlockHeaders #74
+* Minor Java code cleanup #73
+* Added JML specs in #72
+* Ensure that KeyBlob treats field lengths as unsigned shorts #71
 
 ## 1.3.5
 

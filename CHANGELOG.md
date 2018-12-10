@@ -1,10 +1,12 @@
 # Changelog
 
-## 1.3.6
+## 1.3.6 -- 2018-12-10
 
-### Minor Changes
+### Patches
 * Fixed typos in Exception messages (excryption -> encryption) #78
 * Fixed DecryptionMaterialsRequest.Builder to copy EncryptionContext #77
+
+### Maintenance
 * JML Specifications for CipherBlockHeaders #74
 * Minor Java code cleanup #73
 * Added JML specs in #72

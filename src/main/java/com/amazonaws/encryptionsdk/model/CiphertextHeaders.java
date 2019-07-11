@@ -30,6 +30,7 @@ import com.amazonaws.encryptionsdk.exception.ParseException;
 import com.amazonaws.encryptionsdk.internal.Constants;
 import com.amazonaws.encryptionsdk.internal.EncryptionContextSerializer;
 import com.amazonaws.encryptionsdk.internal.PrimitivesParser;
+import com.amazonaws.encryptionsdk.internal.VersionInfo;
 
 /**
  * This class implements the headers for the message (ciphertext) produced by
@@ -179,7 +180,7 @@ public class CiphertextHeaders {
      */
     private int parseVersion(final byte[] b, final int off) throws ParseException {
         version_ = PrimitivesParser.parseByte(b, off);
-        if(CiphertextType.deserialize(version_) == null) {
+        if(CiphertextType.deserialize(version_).getValue() != Byte.parseByte(VersionInfo.VERSION_NUM, 16)) {
             throw new BadCiphertextException("Invalid version type.");
         }
         return 1;

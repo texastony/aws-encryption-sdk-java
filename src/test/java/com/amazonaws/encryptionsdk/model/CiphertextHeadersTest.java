@@ -323,9 +323,9 @@ public class CiphertextHeadersTest {
         final byte[] headerBytes = ciphertextHeaders.toByteArray();
         final ByteBuffer headerBuff = ByteBuffer.wrap(headerBytes);
 
-        readUptoType(headerBuff);
+        readUptoVersion(headerBuff);
 
-        //set version to invalid value of 0.
+        //set version to invalid type of 0.
         headerBuff.put((byte) 0);
 
         final CiphertextHeaders reconstructedHeaders = new CiphertextHeaders();

@@ -38,7 +38,7 @@ public class ParsedCiphertext extends CiphertextHeaders {
      */
     public ParsedCiphertext(final byte[] ciphertext) throws ParseException {
         ciphertext_ = Utils.assertNonNull(ciphertext, "ciphertext");
-        if (ciphertext.isComplete()) {
+        if (isComplete()) {
           offset_ = deserialize(ciphertext_, 0);
         } else {
           throw new BadCiphertextException("Incomplete ciphertext.");

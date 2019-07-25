@@ -15,7 +15,6 @@ package com.amazonaws.encryptionsdk;
 
 import com.amazonaws.encryptionsdk.internal.Utils;
 import com.amazonaws.encryptionsdk.model.CiphertextHeaders;
-import com.amazonaws.encryptionsdk.exception.AwsCryptoException;
 import com.amazonaws.encryptionsdk.exception.BadCiphertextException;
 import com.amazonaws.encryptionsdk.exception.ParseException;
 
@@ -38,9 +37,8 @@ public class ParsedCiphertext extends CiphertextHeaders {
      */
     public ParsedCiphertext(final byte[] ciphertext) throws ParseException {
         ciphertext_ = Utils.assertNonNull(ciphertext, "ciphertext");
-        if (isComplete()) {
-          offset_ = deserialize(ciphertext_, 0);
-        } else {
+        offset_ = deserialize(ciphertext_, 0);
+        if (!this.isComplete()) {
           throw new BadCiphertextException("Incomplete ciphertext.");
         }
     }

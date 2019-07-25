@@ -329,7 +329,7 @@ public class CiphertextHeadersTest {
         headerBuff.put((byte) 0);
 
         final CiphertextHeaders reconstructedHeaders = new CiphertextHeaders();
-        reconstructedHeaders.deserialize(headerBuff.array(), 0);
+        reconstructedHeaders.deserialize(headerBuff.array(), 1);
     }
 
     @Test(expected = BadCiphertextException.class)

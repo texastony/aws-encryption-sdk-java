@@ -181,7 +181,7 @@ public class CiphertextHeaders {
     private int parseVersion(final byte[] b, final int off) throws ParseException {
         version_ = PrimitivesParser.parseByte(b, off);
         if (version_ != VersionInfo.CURRENT_CIPHERTEXT_VERSION) {
-            throw new BadCiphertextException("Invalid version type.");
+            throw new BadCiphertextException("Invalid version ");
         }
         return 1;
     }

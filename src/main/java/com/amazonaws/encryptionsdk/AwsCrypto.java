@@ -282,8 +282,9 @@ public class AwsCrypto {
      * Calls {@link #encryptData(MasterKeyProvider, byte[], Map)} on the UTF-8 encoded bytes of
      * {@code plaintext} and base64 encodes the result.
      * @deprecated Use the {@link #encryptData(MasterKeyProvider, byte[], Map)} and
-     * {@link #decryptData(MasterKeyProvider, byte[])} APIs instead. {@code encryptString} is not out-of-the-box
-     * compatible with the other Encryption SDKs and intentionally not supported by the other implementations.
+     * {@link #decryptData(MasterKeyProvider, byte[])} APIs instead. {@code encryptString} is incompatible with the
+     * other AWS Encryption SDK language implementations. By design, this feature is not supported by the other
+     * language implementations.
      */
     @Deprecated
     public <K extends MasterKey<K>> CryptoResult<String, K> encryptString(
@@ -300,8 +301,9 @@ public class AwsCrypto {
      * Calls {@link #encryptData(CryptoMaterialsManager, byte[], Map)} on the UTF-8 encoded bytes of
      * {@code plaintext} and base64 encodes the result.
      * @deprecated Use the {@link #encryptData(CryptoMaterialsManager, byte[], Map)} and
-     * {@link #decryptData(CryptoMaterialsManager, byte[])} APIs instead. {@code encryptString} is not out-of-the-box
-     * compatible with the other Encryption SDKs and intentionally not supported by the other implementations.
+     * {@link #decryptData(CryptoMaterialsManager, byte[])} APIs instead. {@code encryptString} is incompatible with the
+     * other AWS Encryption SDK language implementations. By design, this feature is not supported by the other
+     * language implementations.
      */
     @Deprecated
     public CryptoResult<String, ?> encryptString(
@@ -322,8 +324,9 @@ public class AwsCrypto {
      * Returns the equivalent to calling {@link #encryptString(MasterKeyProvider, String, Map)} with
      * an empty {@code encryptionContext}.
      * @deprecated Use the {@link #encryptData(MasterKeyProvider, byte[])} and
-     * {@link #decryptData(MasterKeyProvider, byte[])} APIs instead. {@code encryptString} is not out-of-the-box
-     * compatible with the other Encryption SDKs and intentionally not supported the by other implementations.
+     * {@link #decryptData(MasterKeyProvider, byte[])} APIs instead. {@code encryptString} is incompatible with the
+     * other AWS Encryption SDK language implementations. By design, this feature is not supported by the other
+     * language implementations.
      */
     @Deprecated
     public <K extends MasterKey<K>> CryptoResult<String, K> encryptString(final MasterKeyProvider<K> provider,
@@ -335,8 +338,9 @@ public class AwsCrypto {
      * Returns the equivalent to calling {@link #encryptString(CryptoMaterialsManager, String, Map)} with
      * an empty {@code encryptionContext}.
      * @deprecated Use the {@link #encryptData(CryptoMaterialsManager, byte[])} and
-     * {@link #decryptData(CryptoMaterialsManager, byte[])} APIs instead. {@code encryptString} is not out-of-the-box
-     * compatible with the other Encryption SDKs and intentionally not supported the by other implementations.
+     * {@link #decryptData(CryptoMaterialsManager, byte[])} APIs instead. {@code encryptString} is incompatible with the
+     * other AWS Encryption SDK language implementations. By design, this feature is not supported by the other
+     * language implementations.
      */
     @Deprecated
     public CryptoResult<String, ?> encryptString(
@@ -419,8 +423,9 @@ public class AwsCrypto {
      *
      * @see #decryptData(MasterKeyProvider, byte[])
      * @deprecated Use the {@link #decryptData(MasterKeyProvider, byte[])} and
-     * {@link #encryptData(MasterKeyProvider, byte[], Map)}  APIs instead. {@code decryptString} is not out-of-the-box
-     * compatible with the other Encryption SDKs and intentionally not supported the by other implementations.
+     * {@link #encryptData(MasterKeyProvider, byte[], Map)} APIs instead. {@code decryptString} is incompatible with
+     * the other AWS Encryption SDK language implementations. By design, this feature is not supported by the other
+     * language implementations.
      */
     @Deprecated
     @SuppressWarnings("unchecked")
@@ -437,8 +442,9 @@ public class AwsCrypto {
      *
      * @see #decryptData(CryptoMaterialsManager, byte[])
      * @deprecated Use the {@link #decryptData(CryptoMaterialsManager, byte[])} and
-     * {@link #encryptData(CryptoMaterialsManager, byte[], Map)}  APIs instead. {@code decryptString} is not out-of-the-box
-     * compatible with the other Encryption SDKs and intentionally not supported the by other implementations.
+     * {@link #encryptData(CryptoMaterialsManager, byte[], Map)} APIs instead. {@code decryptString} is incompatible
+     * with the other AWS Encryption SDK language implementations. By design, this feature is not supported by the other
+     * language implementations.
      */
     @Deprecated
     public CryptoResult<String, ?> decryptString(final CryptoMaterialsManager provider,

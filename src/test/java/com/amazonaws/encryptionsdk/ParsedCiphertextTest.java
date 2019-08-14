@@ -17,6 +17,7 @@ import com.amazonaws.encryptionsdk.internal.StaticMasterKey;
 import com.amazonaws.encryptionsdk.model.CiphertextHeaders;
 import org.junit.Before;
 import org.junit.Test;
+import static org.junit.Assert.assertArrayEquals;
 
 import com.amazonaws.encryptionsdk.exception.BadCiphertextException;
 
@@ -42,7 +43,7 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
     }
 
     @Test()
-    public void completeCiphertext() {
+    public void encryptDecrypt() {
         final byte[] plaintextBytes = new byte[byteSize];
 
         final Map<String, String> encryptionContext = new HashMap<String, String>(1);
@@ -54,18 +55,25 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
                 masterKeyProvider,
                 plaintextBytes,
                 encryptionContext).getResult();
-        ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
+
+        final ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
+        final byte[] decryptedText = encryptionClient_.decryptData(
+                masterKeyProvider,
+                pCt
+        ).getResult();
+
+        assertArrayEquals(plaintextBytes, decryptedText);
     }
 
     @Test(expected = BadCiphertextException.class)
     public void incompleteZeroByteCiphertext() {
-        final byte[] ciphertext = {0};
-        ParsedCiphertext pCt = new ParsedCiphertext(ciphertext);
+        final byte[] cipherText = {0};
+        ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
     }
 
     @Test(expected = BadCiphertextException.class)
     public void incompleteSingleByteCiphertext() {
-        final byte[] ciphertext = {42};
-        ParsedCiphertext pCt = new ParsedCiphertext(ciphertext);
+        final byte[] cipherText = {42};
+        ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
     }
 }

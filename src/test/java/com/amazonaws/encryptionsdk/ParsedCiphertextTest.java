@@ -1,3 +1,16 @@
+/*
+ * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except
+ * in compliance with the License. A copy of the License is located at
+ *
+ * http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+
 package com.amazonaws.encryptionsdk;
 
 import com.amazonaws.encryptionsdk.internal.StaticMasterKey;
@@ -13,7 +26,6 @@ import java.util.Map;
 import static org.mockito.Mockito.spy;
 
 public class ParsedCiphertextTest extends CiphertextHeaders {
-    final byte[] ciphertext_ = {0};
 
     final int byteSize = 0;
     final int frameSize = 0;
@@ -29,7 +41,7 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
         encryptionClient_.setEncryptionAlgorithm(CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256);
     }
 
-    @Test
+    @Test()
     public void completeCiphertext() {
         final byte[] plaintextBytes = new byte[byteSize];
 
@@ -46,7 +58,14 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
     }
 
     @Test(expected = BadCiphertextException.class)
-    public void incompleteCiphertext() {
-        ParsedCiphertext pCt = new ParsedCiphertext(ciphertext_);
+    public void incompleteZeroByteCiphertext() {
+        final byte[] ciphertext = {0};
+        ParsedCiphertext pCt = new ParsedCiphertext(ciphertext);
+    }
+
+    @Test(expected = BadCiphertextException.class)
+    public void incompleteSingleByteCiphertext() {
+        final byte[] ciphertext = {42};
+        ParsedCiphertext pCt = new ParsedCiphertext(ciphertext);
     }
 }

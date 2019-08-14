@@ -35,7 +35,7 @@ public class ParsedCiphertext extends CiphertextHeaders {
      * {@code ciphertext} and that any changes made to the backing array will be reflected here as
      * well.
      */
-    public ParsedCiphertext(final byte[] ciphertext) throws ParseException {
+    public ParsedCiphertext(final byte[] ciphertext) {
         ciphertext_ = Utils.assertNonNull(ciphertext, "ciphertext");
         offset_ = deserialize(ciphertext_, 0);
         if (!this.isComplete()) {

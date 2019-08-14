@@ -323,13 +323,11 @@ public class CiphertextHeadersTest {
         final byte[] headerBytes = ciphertextHeaders.toByteArray();
         final ByteBuffer headerBuff = ByteBuffer.wrap(headerBytes);
 
-        readUptoVersion(headerBuff);
-
         //set version to invalid type of 0.
         headerBuff.put((byte) 0);
 
         final CiphertextHeaders reconstructedHeaders = new CiphertextHeaders();
-        reconstructedHeaders.deserialize(headerBuff.array(), 1);
+        reconstructedHeaders.deserialize(headerBuff.array(), 0);
     }
 
     @Test(expected = BadCiphertextException.class)

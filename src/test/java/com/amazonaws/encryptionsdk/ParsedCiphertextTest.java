@@ -87,8 +87,9 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
                 masterKeyProvider,
                 plaintextBytes,
                 encryptionContext).getResult();
-        byte[] incompleteCipherText = Arrays.copyOfRange(cipherText, 1, cipherText.length);
+        ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
 
-        final ParsedCiphertext pCt = new ParsedCiphertext(incompleteCipherText);
+        byte[] incompleteCiphertext = Arrays.copyOf(pCt.getCiphertext(), pCt.getOffset() - 1);
+        ParsedCiphertext badPCt = new ParsedCiphertext(incompleteCiphertext);
     }
 }

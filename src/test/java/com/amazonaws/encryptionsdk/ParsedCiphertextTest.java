@@ -14,6 +14,7 @@
 package com.amazonaws.encryptionsdk;
 
 import com.amazonaws.encryptionsdk.internal.StaticMasterKey;
+import com.amazonaws.encryptionsdk.internal.VersionInfo;
 import com.amazonaws.encryptionsdk.model.CiphertextHeaders;
 import org.junit.Before;
 import org.junit.Test;
@@ -68,7 +69,7 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
 
     @Test(expected = BadCiphertextException.class)
     public void incompleteSingleByteCiphertext() {
-        final byte[] cipherText = {0};
+        final byte[] cipherText = {VersionInfo.CURRENT_CIPHERTEXT_VERSION};
         ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
     }
 

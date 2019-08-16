@@ -22,6 +22,7 @@ import com.amazonaws.encryptionsdk.exception.BadCiphertextException;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Arrays;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.spy;
@@ -59,6 +60,7 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
 
         assertNotNull(pCt.getCiphertext());
         assertNotNull(pCt.getOffset());
+        assertEquals(cipherText.length, pCt.getOffset());
     }
 
     @Test(expected = BadCiphertextException.class)
@@ -71,5 +73,23 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
     public void incompleteSingleByteCiphertext() {
         final byte[] cipherText = {0};
         ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
+    }
+
+    @Test(expected = BadCiphertextException.class)
+    public void incompleteCiphertext() {
+        final byte[] plaintextBytes = new byte[byteSize];
+
+        final Map<String, String> encryptionContext = new HashMap<String, String>(1);
+        encryptionContext.put("ENC1", "ParsedCiphertext test with %d" + byteSize);
+
+        encryptionClient_.setEncryptionFrameSize(frameSize);
+
+        final byte[] cipherText = encryptionClient_.encryptData(
+                masterKeyProvider,
+                plaintextBytes,
+                encryptionContext).getResult();
+        byte[] incompleteCipherText = Arrays.copyOfRange(cipherText, 1, cipherText.length);
+        
+        final ParsedCiphertext pCt = new ParsedCiphertext(incompleteCipherText);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except
  * in compliance with the License. A copy of the License is located at
@@ -17,13 +17,13 @@ import com.amazonaws.encryptionsdk.internal.StaticMasterKey;
 import com.amazonaws.encryptionsdk.model.CiphertextHeaders;
 import org.junit.Before;
 import org.junit.Test;
-import static org.junit.Assert.assertArrayEquals;
 
 import com.amazonaws.encryptionsdk.exception.BadCiphertextException;
 
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.spy;
 
 public class ParsedCiphertextTest extends CiphertextHeaders {
@@ -43,7 +43,7 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
     }
 
     @Test()
-    public void encryptDecrypt() {
+    public void goodParsedCiphertext() {
         final byte[] plaintextBytes = new byte[byteSize];
 
         final Map<String, String> encryptionContext = new HashMap<String, String>(1);
@@ -55,25 +55,21 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
                 masterKeyProvider,
                 plaintextBytes,
                 encryptionContext).getResult();
-
         final ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
-        final byte[] decryptedText = encryptionClient_.decryptData(
-                masterKeyProvider,
-                pCt
-        ).getResult();
 
-        assertArrayEquals(plaintextBytes, decryptedText);
+        assertNotNull(pCt.getCiphertext());
+        assertNotNull(pCt.getOffset());
     }
 
     @Test(expected = BadCiphertextException.class)
     public void incompleteZeroByteCiphertext() {
-        final byte[] cipherText = {0};
+        final byte[] cipherText = {};
         ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
     }
 
     @Test(expected = BadCiphertextException.class)
     public void incompleteSingleByteCiphertext() {
-        final byte[] cipherText = {42};
+        final byte[] cipherText = {0};
         ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
     }
 }

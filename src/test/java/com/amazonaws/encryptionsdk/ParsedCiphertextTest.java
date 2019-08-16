@@ -28,10 +28,6 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.spy;
 
 public class ParsedCiphertextTest extends CiphertextHeaders {
-
-    final int byteSize = 0;
-    final int frameSize = 0;
-
     private StaticMasterKey masterKeyProvider;
     private AwsCrypto encryptionClient_;
 
@@ -45,6 +41,8 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
 
     @Test()
     public void goodParsedCiphertext() {
+        final int byteSize = 0;
+        final int frameSize = 0;
         final byte[] plaintextBytes = new byte[byteSize];
 
         final Map<String, String> encryptionContext = new HashMap<String, String>(1);
@@ -60,6 +58,7 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
 
         assertNotNull(pCt.getCiphertext());
         assertNotNull(pCt.getOffset());
+
         assertEquals(cipherText.length, pCt.getOffset());
     }
 
@@ -77,6 +76,8 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
 
     @Test(expected = BadCiphertextException.class)
     public void incompleteCiphertext() {
+        final int byteSize = 0;
+        final int frameSize = 0;
         final byte[] plaintextBytes = new byte[byteSize];
 
         final Map<String, String> encryptionContext = new HashMap<String, String>(1);

@@ -16,7 +16,6 @@ package com.amazonaws.encryptionsdk;
 import com.amazonaws.encryptionsdk.internal.Utils;
 import com.amazonaws.encryptionsdk.model.CiphertextHeaders;
 import com.amazonaws.encryptionsdk.exception.BadCiphertextException;
-import com.amazonaws.encryptionsdk.exception.ParseException;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 

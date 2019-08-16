@@ -1,11 +1,11 @@
 /*
  * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except
  * in compliance with the License. A copy of the License is located at
- *
+ * 
  * http://aws.amazon.com/apache2.0
- *
+ * 
  * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
@@ -161,10 +161,10 @@ public class CiphertextHeadersTest {
      * dataKey_ = new AWSKMSDataKey(testKey_, encryptedKey_);
      * headerNonce_ = ByteFormatCheckValues.getNonce();
      * headerTag_ = ByteFormatCheckValues.getTag();
-     *
+     * 
      * Map<String, String> encryptionContext = new HashMap<String, String>(1);
      * encryptionContext.put("ENC", "CiphertextHeader format check test");
-     *
+     * 
      * final CiphertextHeaders ciphertextHeaders =
      * createCiphertextHeaders(encryptionContext);
      * //NOTE: this test will fail because of the line below.
@@ -173,7 +173,7 @@ public class CiphertextHeadersTest {
      * messageId_ = ciphertextHeaders.getMessageId();
      * final byte[] ciphertextHeaderHash =
      * TestIOUtils.getSha256Hash(ciphertextHeaders.toByteArray());
-     *
+     * 
      * assertArrayEquals(ByteFormatCheckValues.getCiphertextHeaderHash(),
      * ciphertextHeaderHash);
      * }

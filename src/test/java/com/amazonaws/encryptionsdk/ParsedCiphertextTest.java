@@ -57,7 +57,7 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
         final ParsedCiphertext pCt = new ParsedCiphertext(cipherText);
 
         assertNotNull(pCt.getCiphertext());
-        assert pCt.getOffset() > 0;
+        assertTrue(pCt.getOffset() > 0);
     }
 
     @Test(expected = BadCiphertextException.class)

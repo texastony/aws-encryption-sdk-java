@@ -89,7 +89,7 @@ public class ParsedCiphertextTest extends CiphertextHeaders {
                 plaintextBytes,
                 encryptionContext).getResult();
         byte[] incompleteCipherText = Arrays.copyOfRange(cipherText, 1, cipherText.length);
-        
+
         final ParsedCiphertext pCt = new ParsedCiphertext(incompleteCipherText);
     }
 }

@@ -283,8 +283,10 @@ public class AwsCrypto {
      * {@code plaintext} and base64 encodes the result.
      * @deprecated Use the {@link #encryptData(MasterKeyProvider, byte[], Map)} and
      * {@link #decryptData(MasterKeyProvider, byte[])} APIs instead. {@code encryptString} and {@code decryptString}
-     * require an extra Base64 decode/encode step to interoperate with other AWS Encryption SDK implementations. Data
-     * encoding is an application-specific choice. These deprecated APIs will be removed in the future.
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
+     * Encryption SDK, you need to base64 decode the output of {@code encryptString}.
+     * {@code decryptString} will base64 decode plaintext before returning the result.
+     * These deprecated APIs will be removed in the future.
      */
     @Deprecated
     public <K extends MasterKey<K>> CryptoResult<String, K> encryptString(
@@ -302,8 +304,10 @@ public class AwsCrypto {
      * {@code plaintext} and base64 encodes the result.
      * @deprecated Use the {@link #encryptData(CryptoMaterialsManager, byte[], Map)} and
      * {@link #decryptData(CryptoMaterialsManager, byte[])} APIs instead. {@code encryptString} and {@code decryptString}
-     * require an extra Base64 decode/encode step to interoperate with other AWS Encryption SDK implementations. Data
-     * encoding is an application-specific choice. These deprecated APIs will be removed in the future.
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
+     * Encryption SDK, you need to base64 decode the output of {@code encryptString}.
+     * {@code decryptString} will base64 decode plaintext before returning the result.
+     * These deprecated APIs will be removed in the future.
      */
     @Deprecated
     public CryptoResult<String, ?> encryptString(
@@ -325,8 +329,10 @@ public class AwsCrypto {
      * an empty {@code encryptionContext}.
      * @deprecated Use the {@link #encryptData(MasterKeyProvider, byte[])} and
      * {@link #decryptData(MasterKeyProvider, byte[])} APIs instead. {@code encryptString} and {@code decryptString}
-     * require an extra Base64 decode/encode step to interoperate with other AWS Encryption SDK implementations. Data
-     * encoding is an application-specific choice. These deprecated APIs will be removed in the future.
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
+     * Encryption SDK, you need to base64 decode the output of {@code encryptString}.
+     * {@code decryptString} will base64 decode plaintext before returning the result.
+     * These deprecated APIs will be removed in the future.
      */
     @Deprecated
     public <K extends MasterKey<K>> CryptoResult<String, K> encryptString(final MasterKeyProvider<K> provider,
@@ -339,8 +345,10 @@ public class AwsCrypto {
      * an empty {@code encryptionContext}.
      * @deprecated Use the {@link #encryptData(CryptoMaterialsManager, byte[])} and
      * {@link #decryptData(CryptoMaterialsManager, byte[])} APIs instead. {@code encryptString} and {@code decryptString}
-     * require an extra Base64 decode/encode step to interoperate with other AWS Encryption SDK implementations. Data
-     * encoding is an application-specific choice. These deprecated APIs will be removed in the future.
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
+     * Encryption SDK, you need to base64 decode the output of {@code encryptString}.
+     * {@code decryptString} will base64 decode plaintext before returning the result.
+     * These deprecated APIs will be removed in the future.
      */
     @Deprecated
     public CryptoResult<String, ?> encryptString(
@@ -423,10 +431,11 @@ public class AwsCrypto {
      *
      * @see #decryptData(MasterKeyProvider, byte[])
      * @deprecated Use the {@link #decryptData(MasterKeyProvider, byte[])} and
-     * {@link #encryptData(MasterKeyProvider, byte[], Map)} APIs instead. {@code encryptString} and
-     * {@code decryptString} require an extra Base64 decode/encode step to interoperate with other AWS Encryption SDK
-     * implementations. Data encoding is an application-specific choice. These deprecated APIs will be removed in the
-     * future.
+     * {@link #encryptData(MasterKeyProvider, byte[], Map)} APIs instead. {@code encryptString} and {@code decryptString}
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
+     * Encryption SDK, you need to base64 decode the output of {@code encryptString}.
+     * {@code decryptString} will base64 decode plaintext before returning the result.
+     * These deprecated APIs will be removed in the future.
      */
     @Deprecated
     @SuppressWarnings("unchecked")
@@ -443,10 +452,11 @@ public class AwsCrypto {
      *
      * @see #decryptData(CryptoMaterialsManager, byte[])
      * @deprecated Use the {@link #decryptData(CryptoMaterialsManager, byte[])} and
-     * {@link #encryptData(CryptoMaterialsManager, byte[], Map)} APIs instead. {@code encryptString} and
-     * {@code decryptString} require an extra Base64 decode/encode step to interoperate with other AWS Encryption SDK
-     * implementations. Data encoding is an application-specific choice. These deprecated APIs will be removed in the
-     * future.
+     * {@link #encryptData(CryptoMaterialsManager, byte[], Map)} APIs instead. {@code encryptString}  and {@code decryptString}
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
+     * Encryption SDK, you need to base64 decode the output of {@code encryptString}.
+     * {@code decryptString} will base64 decode plaintext before returning the result.
+     * These deprecated APIs will be removed in the future.
      */
     @Deprecated
     public CryptoResult<String, ?> decryptString(final CryptoMaterialsManager provider,

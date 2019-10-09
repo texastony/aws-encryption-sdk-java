@@ -138,6 +138,13 @@ public class StringExample {
 
 You can find more examples in the [examples directory][examples].
 
+## Public API
+
+Our [versioning policy](./VERSIONING.rst) applies to all public and protected classes/methods/fields
+in the  `com.amazonaws.encryptionsdk` package unless otherwise documented.
+
+The `com.amazonaws.encryptionsdk.internal` package is not included in this public API.
+
 ## FAQ
 
 See the [Frequently Asked Questions](https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/faq.html) page in the official documentation.

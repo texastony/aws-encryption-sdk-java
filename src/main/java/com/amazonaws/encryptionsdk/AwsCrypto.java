@@ -429,7 +429,7 @@ public class AwsCrypto {
      * @deprecated Use the {@link #decryptData(MasterKeyProvider, byte[])} and
      * {@link #encryptData(MasterKeyProvider, byte[], Map)} APIs instead. {@code encryptString} and {@code decryptString}
      * work as expected if you use them together. However, to work with other language implementations of the AWS 
-     * Encryption SDK, you need to base64 decode the output of {@code encryptString} and base64-encode the input to
+     * Encryption SDK, you need to base64-decode the output of {@code encryptString} and base64-encode the input to
      * {@code decryptString}. These deprecated APIs will be removed in the future.
      */
     @Deprecated

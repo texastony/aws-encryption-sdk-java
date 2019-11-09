@@ -311,4 +311,25 @@ public final class Utils {
         System.arraycopy(rawBytes, 0, paddedResult, length - rawBytes.length, rawBytes.length);
         return paddedResult;
     }
+
+    /**
+     * Returns true if the prefix of the given length for the input arrays are equal.
+     * This method will return as soon as the first difference is found, and is thus not constant-time.
+     *
+     * @param a      The first array.
+     * @param b      The second array.
+     * @param length The length of the prefix to compare.
+     * @return True if the prefixes are equal, false otherwise.
+     */
+    public static boolean arrayPrefixEquals(final byte[] a, final byte[] b, final int length) {
+        if (a == null || b == null || a.length < length || b.length < length) {
+            return false;
+        }
+        for (int x = 0; x < length; x++) {
+            if (a[x] != b[x]) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

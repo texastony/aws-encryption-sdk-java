@@ -13,6 +13,8 @@
 
 package com.amazonaws.encryptionsdk.keyrings;
 
+import com.amazonaws.encryptionsdk.MasterKey;
+import com.amazonaws.encryptionsdk.MasterKeyProvider;
 import com.amazonaws.encryptionsdk.kms.DataKeyEncryptionDao;
 import com.amazonaws.encryptionsdk.kms.KmsClientSupplier;
 
@@ -60,6 +62,16 @@ public class StandardKeyrings {
     }
 
     /**
+     * Constructs a {@code Keyring} which wraps a {@code MasterKeyProvider} to facilitate transitioning to keyrings.
+     *
+     * @param masterKeyProvider The master key provider.
+     * @return The {@link Keyring}
+     */
+    public static Keyring masterKeyProvider(MasterKeyProvider<? extends MasterKey> masterKeyProvider) {
+        return new MasterKeyProviderKeyring<>(masterKeyProvider);
+    }
+      
+    /**  
      * Constructs a {@code Keyring} which interacts with AWS Key Management Service (KMS) to create,
      * encrypt, and decrypt data keys using KMS defined Customer Master Keys (CMKs).
      *

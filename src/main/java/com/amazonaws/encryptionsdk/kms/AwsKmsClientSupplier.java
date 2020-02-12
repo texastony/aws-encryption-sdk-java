@@ -14,6 +14,7 @@
 package com.amazonaws.encryptionsdk.kms;
 
 import com.amazonaws.ClientConfiguration;
+import com.amazonaws.arn.Arn;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.encryptionsdk.exception.UnsupportedRegionException;
 import com.amazonaws.services.kms.AWSKMS;
@@ -38,7 +39,7 @@ import static org.apache.commons.lang3.Validate.notEmpty;
  * function should be able to handle when the region is null.
  */
 @FunctionalInterface
-public interface KmsClientSupplier {
+public interface AwsKmsClientSupplier {
 
     /**
      * Gets an {@code AWSKMS} client for the given regionId.
@@ -51,7 +52,7 @@ public interface KmsClientSupplier {
     AWSKMS getClient(@Nullable String regionId) throws UnsupportedRegionException;
 
     /**
-     * Gets a Builder for constructing a KmsClientSupplier
+     * Gets a Builder for constructing an AwsKmsClientSupplier
      *
      * @return The builder
      */
@@ -60,7 +61,26 @@ public interface KmsClientSupplier {
     }
 
     /**
-     * Builder to construct a KmsClientSupplier given various
+     * Parses region from the given key id (if possible) and passes that region to the
+     * given clientSupplier to produce an {@code AWSKMS} client.
+     *
+     * @param keyId          The Amazon Resource Name, Key Alias, Alias ARN or KeyId
+     * @param clientSupplier The client supplier
+     * @return AWSKMS The client
+     */
+    static AWSKMS getClientByKeyId(AwsKmsCmkId keyId, AwsKmsClientSupplier clientSupplier) {
+        requireNonNull(keyId, "keyId is required");
+        requireNonNull(clientSupplier, "clientSupplier is required");
+
+        if(keyId.isArn()) {
+            return clientSupplier.getClient(Arn.fromString(keyId.toString()).getRegion());
+        }
+
+        return clientSupplier.getClient(null);
+    }
+
+    /**
+     * Builder to construct an AwsKmsClientSupplier given various
      * optional settings.
      */
     class Builder {
@@ -69,22 +89,22 @@ public interface KmsClientSupplier {
         private ClientConfiguration clientConfiguration;
         private Set<String> allowedRegions = Collections.emptySet();
         private Set<String> excludedRegions = Collections.emptySet();
-        private boolean clientCachingEnabled = false;
+        private boolean clientCachingEnabled = true;
         private final Map<String, AWSKMS> clientsCache = new HashMap<>();
-        private static final Set<String> KMS_METHODS = new HashSet<>();
-        private AWSKMSClientBuilder kmsClientBuilder;
+        private static final Set<String> AWSKMS_METHODS = new HashSet<>();
+        private AWSKMSClientBuilder awsKmsClientBuilder;
 
         static {
-            KMS_METHODS.add("generateDataKey");
-            KMS_METHODS.add("encrypt");
-            KMS_METHODS.add("decrypt");
+            AWSKMS_METHODS.add("generateDataKey");
+            AWSKMS_METHODS.add("encrypt");
+            AWSKMS_METHODS.add("decrypt");
         }
 
-        Builder(AWSKMSClientBuilder kmsClientBuilder) {
-            this.kmsClientBuilder = kmsClientBuilder;
+        Builder(AWSKMSClientBuilder awsKmsClientBuilder) {
+            this.awsKmsClientBuilder = awsKmsClientBuilder;
         }
 
-        public KmsClientSupplier build() {
+        public AwsKmsClientSupplier build() {
             isTrue(allowedRegions.isEmpty() || excludedRegions.isEmpty(),
                     "Either allowed regions or excluded regions may be set, not both.");
 
@@ -104,18 +124,18 @@ public interface KmsClientSupplier {
                 }
 
                 if (credentialsProvider != null) {
-                    kmsClientBuilder = kmsClientBuilder.withCredentials(credentialsProvider);
+                    awsKmsClientBuilder = awsKmsClientBuilder.withCredentials(credentialsProvider);
                 }
 
                 if (clientConfiguration != null) {
-                    kmsClientBuilder = kmsClientBuilder.withClientConfiguration(clientConfiguration);
+                    awsKmsClientBuilder = awsKmsClientBuilder.withClientConfiguration(clientConfiguration);
                 }
 
                 if (regionId != null) {
-                    kmsClientBuilder = kmsClientBuilder.withRegion(regionId);
+                    awsKmsClientBuilder = awsKmsClientBuilder.withRegion(regionId);
                 }
 
-                AWSKMS client = kmsClientBuilder.build();
+                AWSKMS client = awsKmsClientBuilder.build();
 
                 if (clientCachingEnabled) {
                     client = newCachingProxy(client, regionId);
@@ -168,7 +188,8 @@ public interface KmsClientSupplier {
         }
 
         /**
-         * When set to true, allows for the AWSKMS client for each region to be cached and reused.
+         * When set to false, disables the AWSKMS client for each region from being cached and reused.
+         * By default, client caching is enabled.
          *
          * @param enabled Whether or not caching is enabled.
          */
@@ -179,7 +200,7 @@ public interface KmsClientSupplier {
 
         /**
          * Creates a proxy for the AWSKMS client that will populate the client into the client cache
-         * after a KMS method successfully completes or a KMS exception occurs. This is to prevent a
+         * after an AWS KMS method successfully completes or an AWS KMS exception occurs. This is to prevent a
          * a malicious user from causing a local resource DOS by sending ciphertext with a large number
          * of spurious regions, thereby filling the cache with regions and exhausting resources.
          *
@@ -194,13 +215,13 @@ public interface KmsClientSupplier {
                     (proxy, method, methodArgs) -> {
                         try {
                             final Object result = method.invoke(client, methodArgs);
-                            if (KMS_METHODS.contains(method.getName())) {
+                            if (AWSKMS_METHODS.contains(method.getName())) {
                                 clientsCache.put(regionId, client);
                             }
                             return result;
                         } catch (InvocationTargetException e) {
                             if (e.getTargetException() instanceof AWSKMSException &&
-                                    KMS_METHODS.contains(method.getName())) {
+                                    AWSKMS_METHODS.contains(method.getName())) {
                                 clientsCache.put(regionId, client);
                             }
 

@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Collections;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.times;
@@ -38,7 +39,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class KmsClientSupplierTest {
+class AwsKmsClientSupplierTest {
 
     @Mock AWSKMSClientBuilder kmsClientBuilder;
     @Mock AWSKMS awskms;
@@ -57,7 +58,7 @@ class KmsClientSupplierTest {
         when(kmsClientBuilder.withCredentials(credentialsProvider)).thenReturn(kmsClientBuilder);
         when(kmsClientBuilder.build()).thenReturn(awskms);
 
-        KmsClientSupplier supplier = new KmsClientSupplier.Builder(kmsClientBuilder)
+        AwsKmsClientSupplier supplier = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
                 .credentialsProvider(credentialsProvider)
                 .clientConfiguration(clientConfiguration)
                 .build();
@@ -71,7 +72,7 @@ class KmsClientSupplierTest {
 
     @Test
     void testAllowedAndExcludedRegions() {
-        KmsClientSupplier supplierWithDefaultValues = new KmsClientSupplier.Builder(kmsClientBuilder)
+        AwsKmsClientSupplier supplierWithDefaultValues = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
                 .build();
 
         when(kmsClientBuilder.withRegion(REGION_1)).thenReturn(kmsClientBuilder);
@@ -79,7 +80,7 @@ class KmsClientSupplierTest {
 
         assertNotNull(supplierWithDefaultValues.getClient(REGION_1));
 
-        KmsClientSupplier supplierWithAllowed = new KmsClientSupplier.Builder(kmsClientBuilder)
+        AwsKmsClientSupplier supplierWithAllowed = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
                 .allowedRegions(Collections.singleton(REGION_1))
                 .build();
 
@@ -89,7 +90,7 @@ class KmsClientSupplierTest {
         assertNotNull(supplierWithAllowed.getClient(REGION_1));
         assertThrows(UnsupportedRegionException.class, () -> supplierWithAllowed.getClient(REGION_2));
 
-        KmsClientSupplier supplierWithExcluded = new KmsClientSupplier.Builder(kmsClientBuilder)
+        AwsKmsClientSupplier supplierWithExcluded = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
                 .excludedRegions(Collections.singleton(REGION_1))
                 .build();
 
@@ -99,7 +100,7 @@ class KmsClientSupplierTest {
         assertThrows(UnsupportedRegionException.class, () -> supplierWithExcluded.getClient(REGION_1));
         assertNotNull(supplierWithExcluded.getClient(REGION_2));
 
-        assertThrows(IllegalArgumentException.class, () -> new KmsClientSupplier.Builder(kmsClientBuilder)
+        assertThrows(IllegalArgumentException.class, () -> new AwsKmsClientSupplier.Builder(kmsClientBuilder)
                 .allowedRegions(Collections.singleton(REGION_1))
                 .excludedRegions(Collections.singleton(REGION_2))
                 .build());
@@ -107,7 +108,7 @@ class KmsClientSupplierTest {
 
     @Test
     void testClientCachingDisabled() {
-        KmsClientSupplier supplierCachingDisabled = new KmsClientSupplier.Builder(kmsClientBuilder)
+        AwsKmsClientSupplier supplierCachingDisabled = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
                 .clientCaching(false)
                 .build();
 
@@ -126,8 +127,7 @@ class KmsClientSupplierTest {
 
     @Test
     void testClientCaching() {
-        KmsClientSupplier supplier = new KmsClientSupplier.Builder(kmsClientBuilder)
-                .clientCaching(true)
+        AwsKmsClientSupplier supplier = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
                 .build();
 
         when(kmsClientBuilder.withRegion(REGION_1)).thenReturn(kmsClientBuilder);
@@ -169,5 +169,19 @@ class KmsClientSupplierTest {
         client3.toString();
         supplier.getClient(REGION_3);
         verify(kmsClientBuilder, times(8)).build();
+    }
+
+    @Test
+    void testGetClientByKeyId() {
+
+        final String arn = "arn:aws:kms:us-east-1:999999999999:key/01234567-89ab-cdef-fedc-ba9876543210";
+        final String aliasArn = "arn:aws:kms:us-east-1:999999999999:alias/MyCryptoKey";
+        final String alias = "alias/MyCryptoKey";
+        final String keyId = "01234567-89ab-cdef-fedc-ba9876543210";
+
+        assertEquals(awskms, AwsKmsClientSupplier.getClientByKeyId(AwsKmsCmkId.fromString(arn), s -> awskms));
+        assertEquals(awskms, AwsKmsClientSupplier.getClientByKeyId(AwsKmsCmkId.fromString(aliasArn), s -> awskms));
+        assertEquals(awskms, AwsKmsClientSupplier.getClientByKeyId(AwsKmsCmkId.fromString(alias), s -> awskms));
+        assertEquals(awskms, AwsKmsClientSupplier.getClientByKeyId(AwsKmsCmkId.fromString(keyId), s -> awskms));
     }
 }

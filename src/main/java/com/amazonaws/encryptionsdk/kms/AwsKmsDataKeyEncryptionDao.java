@@ -36,8 +36,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.amazonaws.encryptionsdk.EncryptedDataKey.PROVIDER_ENCODING;
-import static com.amazonaws.encryptionsdk.kms.KmsUtils.KMS_PROVIDER_ID;
-import static com.amazonaws.encryptionsdk.kms.KmsUtils.getClientByArn;
+import static com.amazonaws.encryptionsdk.internal.Constants.AWS_KMS_PROVIDER_ID;
+import static com.amazonaws.encryptionsdk.kms.AwsKmsClientSupplier.getClientByKeyId;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.Validate.isTrue;
 
@@ -46,12 +46,12 @@ import static org.apache.commons.lang3.Validate.isTrue;
  * generation, encryption, and decryption of data keys. The KmsMethods interface is implemented
  * to allow usage in KmsMasterKey.
  */
-class KmsDataKeyEncryptionDao implements DataKeyEncryptionDao, KmsMethods {
+class AwsKmsDataKeyEncryptionDao implements DataKeyEncryptionDao, KmsMethods {
 
-    private final KmsClientSupplier clientSupplier;
+    private final AwsKmsClientSupplier clientSupplier;
     private List<String> grantTokens;
 
-    KmsDataKeyEncryptionDao(KmsClientSupplier clientSupplier, List<String> grantTokens) {
+    AwsKmsDataKeyEncryptionDao(AwsKmsClientSupplier clientSupplier, List<String> grantTokens) {
         requireNonNull(clientSupplier, "clientSupplier is required");
 
         this.clientSupplier = clientSupplier;
@@ -59,7 +59,7 @@ class KmsDataKeyEncryptionDao implements DataKeyEncryptionDao, KmsMethods {
     }
 
     @Override
-    public GenerateDataKeyResult generateDataKey(String keyId, CryptoAlgorithm algorithmSuite, Map<String, String> encryptionContext) {
+    public GenerateDataKeyResult generateDataKey(AwsKmsCmkId keyId, CryptoAlgorithm algorithmSuite, Map<String, String> encryptionContext) {
         requireNonNull(keyId, "keyId is required");
         requireNonNull(algorithmSuite, "algorithmSuite is required");
         requireNonNull(encryptionContext, "encryptionContext is required");
@@ -67,10 +67,10 @@ class KmsDataKeyEncryptionDao implements DataKeyEncryptionDao, KmsMethods {
         final com.amazonaws.services.kms.model.GenerateDataKeyResult kmsResult;
 
         try {
-            kmsResult = getClientByArn(keyId, clientSupplier)
+            kmsResult = getClientByKeyId(keyId, clientSupplier)
                     .generateDataKey(updateUserAgent(
                             new GenerateDataKeyRequest()
-                                    .withKeyId(keyId)
+                                    .withKeyId(keyId.toString())
                                     .withNumberOfBytes(algorithmSuite.getDataKeyLength())
                                     .withEncryptionContext(encryptionContext)
                                     .withGrantTokens(grantTokens)));
@@ -87,11 +87,11 @@ class KmsDataKeyEncryptionDao implements DataKeyEncryptionDao, KmsMethods {
         kmsResult.getCiphertextBlob().get(encryptedKey);
 
         return new GenerateDataKeyResult(new SecretKeySpec(rawKey, algorithmSuite.getDataKeyAlgo()),
-                new KeyBlob(KMS_PROVIDER_ID, kmsResult.getKeyId().getBytes(PROVIDER_ENCODING), encryptedKey));
+                new KeyBlob(AWS_KMS_PROVIDER_ID, kmsResult.getKeyId().getBytes(PROVIDER_ENCODING), encryptedKey));
     }
 
     @Override
-    public EncryptedDataKey encryptDataKey(final String keyId, SecretKey plaintextDataKey, Map<String, String> encryptionContext) {
+    public EncryptedDataKey encryptDataKey(final AwsKmsCmkId keyId, SecretKey plaintextDataKey, Map<String, String> encryptionContext) {
         requireNonNull(keyId, "keyId is required");
         requireNonNull(plaintextDataKey, "plaintextDataKey is required");
         requireNonNull(encryptionContext, "encryptionContext is required");
@@ -100,9 +100,9 @@ class KmsDataKeyEncryptionDao implements DataKeyEncryptionDao, KmsMethods {
         final com.amazonaws.services.kms.model.EncryptResult kmsResult;
 
         try {
-            kmsResult = getClientByArn(keyId, clientSupplier)
+            kmsResult = getClientByKeyId(keyId, clientSupplier)
                     .encrypt(updateUserAgent(new EncryptRequest()
-                            .withKeyId(keyId)
+                            .withKeyId(keyId.toString())
                             .withPlaintext(ByteBuffer.wrap(plaintextDataKey.getEncoded()))
                             .withEncryptionContext(encryptionContext)
                             .withGrantTokens(grantTokens)));
@@ -112,7 +112,7 @@ class KmsDataKeyEncryptionDao implements DataKeyEncryptionDao, KmsMethods {
         final byte[] encryptedDataKey = new byte[kmsResult.getCiphertextBlob().remaining()];
         kmsResult.getCiphertextBlob().get(encryptedDataKey);
 
-        return new KeyBlob(KMS_PROVIDER_ID, kmsResult.getKeyId().getBytes(PROVIDER_ENCODING), encryptedDataKey);
+        return new KeyBlob(AWS_KMS_PROVIDER_ID, kmsResult.getKeyId().getBytes(PROVIDER_ENCODING), encryptedDataKey);
 
     }
 
@@ -126,7 +126,7 @@ class KmsDataKeyEncryptionDao implements DataKeyEncryptionDao, KmsMethods {
         final com.amazonaws.services.kms.model.DecryptResult kmsResult;
 
         try {
-            kmsResult = getClientByArn(providerInformation, clientSupplier)
+            kmsResult = getClientByKeyId(AwsKmsCmkId.fromString(providerInformation), clientSupplier)
                     .decrypt(updateUserAgent(new DecryptRequest()
                             .withCiphertextBlob(ByteBuffer.wrap(encryptedDataKey.getEncryptedDataKey()))
                             .withEncryptionContext(encryptionContext)

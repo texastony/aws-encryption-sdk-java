@@ -18,7 +18,6 @@ import com.amazonaws.encryptionsdk.DataKey;
 import com.amazonaws.encryptionsdk.EncryptedDataKey;
 import com.amazonaws.encryptionsdk.exception.MismatchedDataKeyException;
 import com.amazonaws.encryptionsdk.model.KeyBlob;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -32,8 +31,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.amazonaws.encryptionsdk.EncryptedDataKey.PROVIDER_ENCODING;
+import static com.amazonaws.encryptionsdk.internal.Constants.AWS_KMS_PROVIDER_ID;
 import static com.amazonaws.encryptionsdk.internal.RandomBytesGenerator.generate;
-import static com.amazonaws.encryptionsdk.kms.KmsUtils.KMS_PROVIDER_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
@@ -43,7 +42,7 @@ class KmsMasterKeyTest {
     private static final CryptoAlgorithm ALGORITHM_SUITE = CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384;
     private static final Map<String, String> ENCRYPTION_CONTEXT = Collections.singletonMap("test", "value");
     private static final String CMK_ARN = "arn:aws:kms:us-east-1:999999999999:key/01234567-89ab-cdef-fedc-ba9876543210";
-    @Mock KmsDataKeyEncryptionDao dataKeyEncryptionDao;
+    @Mock AwsKmsDataKeyEncryptionDao dataKeyEncryptionDao;
 
     /**
      * Test that when decryption of an encrypted data key throws a MismatchedDataKeyException, this
@@ -51,8 +50,8 @@ class KmsMasterKeyTest {
      */
     @Test
     void testMismatchedDataKeyException() {
-        EncryptedDataKey encryptedDataKey1 = new KeyBlob(KMS_PROVIDER_ID, "KeyId1".getBytes(PROVIDER_ENCODING), generate(64));
-        EncryptedDataKey encryptedDataKey2 = new KeyBlob(KMS_PROVIDER_ID, "KeyId2".getBytes(PROVIDER_ENCODING), generate(64));
+        EncryptedDataKey encryptedDataKey1 = new KeyBlob(AWS_KMS_PROVIDER_ID, "KeyId1".getBytes(PROVIDER_ENCODING), generate(64));
+        EncryptedDataKey encryptedDataKey2 = new KeyBlob(AWS_KMS_PROVIDER_ID, "KeyId2".getBytes(PROVIDER_ENCODING), generate(64));
         SecretKey secretKey = new SecretKeySpec(generate(ALGORITHM_SUITE.getDataKeyLength()), ALGORITHM_SUITE.getDataKeyAlgo());
 
         when(dataKeyEncryptionDao.decryptDataKey(encryptedDataKey1, ALGORITHM_SUITE, ENCRYPTION_CONTEXT))

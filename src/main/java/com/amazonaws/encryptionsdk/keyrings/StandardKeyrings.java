@@ -13,12 +13,9 @@
 
 package com.amazonaws.encryptionsdk.keyrings;
 
-import com.amazonaws.encryptionsdk.kms.DataKeyEncryptionDao;
-import com.amazonaws.encryptionsdk.kms.KmsClientSupplier;
+import com.amazonaws.encryptionsdk.kms.AwsKmsClientSupplier;
+import com.amazonaws.encryptionsdk.kms.AwsKmsCmkId;
 
-import javax.crypto.SecretKey;
-import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.util.Arrays;
 import java.util.List;
 
@@ -31,48 +28,74 @@ public class StandardKeyrings {
     }
 
     /**
-     * Constructs a {@code Keyring} which does local AES-GCM encryption
-     * decryption of data keys using the provided wrapping key.
+     * Returns a {@link RawAesKeyringBuilder} for use in constructing a keyring which does local AES-GCM encryption
+     * decryption of data keys using a provided wrapping key.
      *
-     * @param keyNamespace A value that, together with the key name, identifies the wrapping key.
-     * @param keyName      A value that, together with the key namespace, identifies the wrapping key.
-     * @param wrappingKey  The AES key input to AES-GCM to encrypt plaintext data keys.
-     * @return The {@link Keyring}
+     * @return The {@link RawAesKeyringBuilder}
      */
-    public static Keyring rawAes(String keyNamespace, String keyName, SecretKey wrappingKey) {
-        return new RawAesKeyring(keyNamespace, keyName, wrappingKey);
+    public static RawAesKeyringBuilder rawAesBuilder() {
+        return RawAesKeyringBuilder.standard();
     }
 
     /**
-     * Constructs a {@code Keyring} which does local RSA encryption and decryption of data keys using the
+     * Constructs a {@code RawRsaKeyringBuilder} which does local RSA encryption and decryption of data keys using the
      * provided public and private keys. If {@code privateKey} is {@code null} then the returned {@code Keyring}
      * can only be used for encryption.
      *
-     * @param keyNamespace      A value that, together with the key name, identifies the wrapping key.
-     * @param keyName           A value that, together with the key namespace, identifies the wrapping key.
-     * @param publicKey         The RSA public key used by this keyring to encrypt data keys.
-     * @param privateKey        The RSA private key used by this keyring to decrypt data keys.
-     * @param wrappingAlgorithm The RSA algorithm to use with this keyring.
-     * @return The {@link Keyring}
+     * @return The {@link RawRsaKeyringBuilder}
      */
-    public static Keyring rawRsa(String keyNamespace, String keyName, PublicKey publicKey, PrivateKey privateKey, String wrappingAlgorithm) {
-        return new RawRsaKeyring(keyNamespace, keyName, publicKey, privateKey, wrappingAlgorithm);
+    public static RawRsaKeyringBuilder rawRsaBuilder() {
+        return RawRsaKeyringBuilder.standard();
     }
       
     /**  
      * Constructs a {@code Keyring} which interacts with AWS Key Management Service (KMS) to create,
-     * encrypt, and decrypt data keys using KMS defined Customer Master Keys (CMKs).
+     * encrypt, and decrypt data keys using the supplied AWS KMS defined Customer Master Key (CMK).
+     * Use {@link #awsKmsBuilder()} for more advanced configuration using an {@link AwsKmsKeyringBuilder}
      *
-     * @param clientSupplier    A function that returns a KMS client that can make GenerateDataKey,
-     *                          Encrypt, and Decrypt calls in a particular AWS region.
-     * @param grantTokens       A list of string grant tokens to be included in all KMS calls.
-     * @param keyIds            A list of strings identifying KMS CMKs, in ARN, CMK Alias, or ARN Alias format.
-     * @param generator         A string that identifies a KMS CMK responsible for generating a data key,
-     *                          as well as encrypting and decrypting data keys in ARN, CMK Alias, or ARN Alias format.
+     * @param generatorKeyId    An {@link AwsKmsCmkId} in ARN, CMK Alias, ARN Alias or Key Id format that identifies a
+     *                          AWS KMS CMK responsible for generating a data key, as well as encrypting and
+     *                          decrypting data keys .
      * @return The {@code Keyring}
      */
-    public static Keyring kms(KmsClientSupplier clientSupplier, List<String> grantTokens, List<String> keyIds, String generator) {
-        return new KmsKeyring(DataKeyEncryptionDao.kms(clientSupplier, grantTokens), keyIds, generator);
+    public static Keyring awsKms(AwsKmsCmkId generatorKeyId) {
+        return AwsKmsKeyringBuilder.standard()
+                .generatorKeyId(generatorKeyId)
+                .build();
+    }
+
+    /**
+     * Returns a {@link AwsKmsKeyringBuilder} for use in constructing a keyring which interacts with
+     * AWS Key Management Service (KMS) to create, encrypt, and decrypt data keys using AWS KMS defined
+     * Customer Master Keys (CMKs).
+     *
+     * @return The {@link AwsKmsKeyringBuilder}
+     */
+    public static AwsKmsKeyringBuilder awsKmsBuilder() {
+        return AwsKmsKeyringBuilder.standard();
+    }
+
+    /**
+     * Returns an {@link AwsKmsKeyringBuilder} for use in constructing an AWS KMS Discovery keyring.
+     * AWS KMS Discovery keyrings do not specify any CMKs to decrypt with, and thus will attempt to decrypt
+     * using any encrypted data key in an encrypted message. AWS KMS Discovery keyrings do not perform encryption.
+     * <p></p>
+     * To create an AWS KMS Regional Discovery Keyring, construct an {@link AwsKmsClientSupplier} using
+     * {@link AwsKmsClientSupplier#builder()} to specify which regions to include/exclude.
+     * <p></p>
+     * For example, to include only CMKs in the us-east-1 region:
+     * <pre>
+     * StandardKeyrings.awsKmsDiscovery()
+     *             .awsKmsClientSupplier(
+     *                     AwsKmsClientSupplier.builder()
+     *                     .allowedRegions(Collections.singleton("us-east-1")).build())
+     *             .build();
+     * </pre>
+     *
+     * @return The {@code AwsKmsKeyringBuilder}
+     */
+    public static AwsKmsKeyringBuilder awsKmsDiscoveryBuilder() {
+        return AwsKmsKeyringBuilder.discovery();
     }
 
     /**

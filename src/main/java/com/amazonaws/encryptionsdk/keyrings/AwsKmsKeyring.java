@@ -16,14 +16,14 @@ package com.amazonaws.encryptionsdk.keyrings;
 import com.amazonaws.encryptionsdk.EncryptedDataKey;
 import com.amazonaws.encryptionsdk.exception.AwsCryptoException;
 import com.amazonaws.encryptionsdk.exception.CannotUnwrapDataKeyException;
-import com.amazonaws.encryptionsdk.exception.MalformedArnException;
+import com.amazonaws.encryptionsdk.kms.AwsKmsCmkId;
 import com.amazonaws.encryptionsdk.kms.DataKeyEncryptionDao;
 import com.amazonaws.encryptionsdk.kms.DataKeyEncryptionDao.DecryptDataKeyResult;
 import com.amazonaws.encryptionsdk.kms.DataKeyEncryptionDao.GenerateDataKeyResult;
-import com.amazonaws.encryptionsdk.kms.KmsUtils;
 import com.amazonaws.encryptionsdk.model.DecryptionMaterials;
 import com.amazonaws.encryptionsdk.model.EncryptionMaterials;
 import com.amazonaws.encryptionsdk.model.KeyBlob;
+import org.apache.commons.lang3.Validate;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -31,52 +31,53 @@ import java.util.List;
 import java.util.Set;
 
 import static com.amazonaws.encryptionsdk.EncryptedDataKey.PROVIDER_ENCODING;
-import static com.amazonaws.encryptionsdk.kms.KmsUtils.KMS_PROVIDER_ID;
-import static com.amazonaws.encryptionsdk.kms.KmsUtils.isArnWellFormed;
+import static com.amazonaws.encryptionsdk.internal.Constants.AWS_KMS_PROVIDER_ID;
+import static com.amazonaws.encryptionsdk.kms.AwsKmsCmkId.isKeyIdWellFormed;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 /**
  * A keyring which interacts with AWS Key Management Service (KMS) to create,
- * encrypt, and decrypt data keys using KMS defined Customer Master Keys (CMKs).
+ * encrypt, and decrypt data keys using AWS KMS defined Customer Master Keys (CMKs).
  */
-class KmsKeyring implements Keyring {
+class AwsKmsKeyring implements Keyring {
 
     private final DataKeyEncryptionDao dataKeyEncryptionDao;
-    private final List<String> keyIds;
-    private final String generatorKeyId;
+    private final List<AwsKmsCmkId> keyIds;
+    private final AwsKmsCmkId generatorKeyId;
     private final boolean isDiscovery;
 
-    KmsKeyring(DataKeyEncryptionDao dataKeyEncryptionDao, List<String> keyIds, String generatorKeyId) {
+    AwsKmsKeyring(DataKeyEncryptionDao dataKeyEncryptionDao, List<AwsKmsCmkId> keyIds, AwsKmsCmkId generatorKeyId, boolean isDiscovery) {
         requireNonNull(dataKeyEncryptionDao, "dataKeyEncryptionDao is required");
         this.dataKeyEncryptionDao = dataKeyEncryptionDao;
         this.keyIds = keyIds == null ? emptyList() : unmodifiableList(new ArrayList<>(keyIds));
         this.generatorKeyId = generatorKeyId;
-        this.isDiscovery = this.generatorKeyId == null && this.keyIds.isEmpty();
+        this.isDiscovery = isDiscovery;
 
-        if (!this.keyIds.stream().allMatch(KmsUtils::isArnWellFormed)) {
-            throw new MalformedArnException("keyIds must contain only CMK aliases and well formed ARNs");
+        if(isDiscovery) {
+            Validate.isTrue(generatorKeyId == null && this.keyIds.isEmpty(),
+                    "AWS KMS Discovery keyrings cannot specify any key IDs");
+        } else {
+            Validate.isTrue(generatorKeyId != null || !this.keyIds.isEmpty(),
+                    "GeneratorKeyId or KeyIds are required for non-discovery AWS KMS Keyrings.");
         }
 
-        if (generatorKeyId != null) {
-            if (!isArnWellFormed(generatorKeyId)) {
-                throw new MalformedArnException("generatorKeyId must be either a CMK alias or a well formed ARN");
-            }
-            if (this.keyIds.contains(generatorKeyId)) {
-                throw new IllegalArgumentException("KeyIds should not contain the generatorKeyId");
-            }
+        if (this.keyIds.contains(generatorKeyId)) {
+            throw new IllegalArgumentException("KeyIds should not contain the generatorKeyId");
         }
     }
 
     @Override
-    public void onEncrypt(EncryptionMaterials encryptionMaterials) {
+    public EncryptionMaterials onEncrypt(EncryptionMaterials encryptionMaterials) {
         requireNonNull(encryptionMaterials, "encryptionMaterials are required");
 
         // If this keyring is a discovery keyring, OnEncrypt MUST return the input encryption materials unmodified.
         if (isDiscovery) {
-            return;
+            return encryptionMaterials;
         }
+
+        EncryptionMaterials resultMaterials = encryptionMaterials;
 
         // If the input encryption materials do not contain a plaintext data key and this keyring does not
         // have a generator defined, OnEncrypt MUST not modify the encryption materials and MUST fail.
@@ -84,12 +85,12 @@ class KmsKeyring implements Keyring {
             throw new AwsCryptoException("Encryption materials must contain either a plaintext data key or a generator");
         }
 
-        final List<String> keyIdsToEncrypt = new ArrayList<>(keyIds);
+        final List<AwsKmsCmkId> keyIdsToEncrypt = new ArrayList<>(keyIds);
 
         // If the input encryption materials do not contain a plaintext data key and a generator is defined onEncrypt
         // MUST attempt to generate a new plaintext data key and encrypt that data key by calling KMS GenerateDataKey.
         if (!encryptionMaterials.hasCleartextDataKey()) {
-            generateDataKey(encryptionMaterials);
+            resultMaterials = generateDataKey(encryptionMaterials);
         } else if (generatorKeyId != null) {
             // If this keyring's generator is defined and was not used to generate a data key, OnEncrypt
             // MUST also attempt to encrypt the plaintext data key using the CMK specified by the generator.
@@ -98,39 +99,45 @@ class KmsKeyring implements Keyring {
 
         // Given a plaintext data key in the encryption materials, OnEncrypt MUST attempt
         // to encrypt the plaintext data key using each CMK specified in it's key IDs list.
-        for (String keyId : keyIdsToEncrypt) {
-            encryptDataKey(keyId, encryptionMaterials);
+        for (AwsKmsCmkId keyId : keyIdsToEncrypt) {
+            resultMaterials = encryptDataKey(keyId, resultMaterials);
         }
+
+        return resultMaterials;
     }
 
-    private void generateDataKey(final EncryptionMaterials encryptionMaterials) {
+    private EncryptionMaterials generateDataKey(final EncryptionMaterials encryptionMaterials) {
         final GenerateDataKeyResult result = dataKeyEncryptionDao.generateDataKey(generatorKeyId,
                 encryptionMaterials.getAlgorithm(), encryptionMaterials.getEncryptionContext());
 
-        encryptionMaterials.setCleartextDataKey(result.getPlaintextDataKey(),
-                new KeyringTraceEntry(KMS_PROVIDER_ID, generatorKeyId, KeyringTraceFlag.GENERATED_DATA_KEY));
-        encryptionMaterials.addEncryptedDataKey(new KeyBlob(result.getEncryptedDataKey()),
-                new KeyringTraceEntry(KMS_PROVIDER_ID, generatorKeyId, KeyringTraceFlag.ENCRYPTED_DATA_KEY, KeyringTraceFlag.SIGNED_ENCRYPTION_CONTEXT));
+        return encryptionMaterials
+                .withCleartextDataKey(result.getPlaintextDataKey(),
+                        new KeyringTraceEntry(AWS_KMS_PROVIDER_ID, generatorKeyId.toString(),
+                                KeyringTraceFlag.GENERATED_DATA_KEY))
+                .withEncryptedDataKey(new KeyBlob(result.getEncryptedDataKey()),
+                        new KeyringTraceEntry(AWS_KMS_PROVIDER_ID, generatorKeyId.toString(),
+                                KeyringTraceFlag.ENCRYPTED_DATA_KEY, KeyringTraceFlag.SIGNED_ENCRYPTION_CONTEXT));
     }
 
-    private void encryptDataKey(final String keyId, final EncryptionMaterials encryptionMaterials) {
+    private EncryptionMaterials encryptDataKey(final AwsKmsCmkId keyId, final EncryptionMaterials encryptionMaterials) {
         final EncryptedDataKey encryptedDataKey = dataKeyEncryptionDao.encryptDataKey(keyId,
                 encryptionMaterials.getCleartextDataKey(), encryptionMaterials.getEncryptionContext());
 
-        encryptionMaterials.addEncryptedDataKey(new KeyBlob(encryptedDataKey),
-                new KeyringTraceEntry(KMS_PROVIDER_ID, keyId, KeyringTraceFlag.ENCRYPTED_DATA_KEY, KeyringTraceFlag.SIGNED_ENCRYPTION_CONTEXT));
+        return encryptionMaterials.withEncryptedDataKey(new KeyBlob(encryptedDataKey),
+                new KeyringTraceEntry(AWS_KMS_PROVIDER_ID, keyId.toString(),
+                        KeyringTraceFlag.ENCRYPTED_DATA_KEY, KeyringTraceFlag.SIGNED_ENCRYPTION_CONTEXT));
     }
 
     @Override
-    public void onDecrypt(DecryptionMaterials decryptionMaterials, List<? extends EncryptedDataKey> encryptedDataKeys) {
+    public DecryptionMaterials onDecrypt(DecryptionMaterials decryptionMaterials, List<? extends EncryptedDataKey> encryptedDataKeys) {
         requireNonNull(decryptionMaterials, "decryptionMaterials are required");
         requireNonNull(encryptedDataKeys, "encryptedDataKeys are required");
 
         if (decryptionMaterials.hasCleartextDataKey() || encryptedDataKeys.isEmpty()) {
-            return;
+            return decryptionMaterials;
         }
 
-        final Set<String> configuredKeyIds = new HashSet<>(keyIds);
+        final Set<AwsKmsCmkId> configuredKeyIds = new HashSet<>(keyIds);
 
         if (generatorKeyId != null) {
             configuredKeyIds.add(generatorKeyId);
@@ -142,25 +149,26 @@ class KmsKeyring implements Keyring {
                     final DecryptDataKeyResult result = dataKeyEncryptionDao.decryptDataKey(encryptedDataKey,
                             decryptionMaterials.getAlgorithm(), decryptionMaterials.getEncryptionContext());
 
-                    decryptionMaterials.setCleartextDataKey(result.getPlaintextDataKey(),
-                            new KeyringTraceEntry(KMS_PROVIDER_ID, result.getKeyArn(),
+                    return decryptionMaterials.withCleartextDataKey(result.getPlaintextDataKey(),
+                            new KeyringTraceEntry(AWS_KMS_PROVIDER_ID, result.getKeyArn(),
                                     KeyringTraceFlag.DECRYPTED_DATA_KEY, KeyringTraceFlag.VERIFIED_ENCRYPTION_CONTEXT));
-                    return;
                 } catch (CannotUnwrapDataKeyException e) {
                     continue;
                 }
             }
         }
+
+        return decryptionMaterials;
     }
 
-    private boolean okToDecrypt(EncryptedDataKey encryptedDataKey, Set<String> configuredKeyIds) {
+    private boolean okToDecrypt(EncryptedDataKey encryptedDataKey, Set<AwsKmsCmkId> configuredKeyIds) {
         // Only attempt to decrypt keys provided by KMS
-        if (!encryptedDataKey.getProviderId().equals(KMS_PROVIDER_ID)) {
+        if (!encryptedDataKey.getProviderId().equals(AWS_KMS_PROVIDER_ID)) {
             return false;
         }
 
-        // If the key ARN cannot be parsed, skip it
-        if(!isArnWellFormed(new String(encryptedDataKey.getProviderInformation(), PROVIDER_ENCODING)))
+        // If the key ID cannot be parsed, skip it
+        if(!isKeyIdWellFormed(new String(encryptedDataKey.getProviderInformation(), PROVIDER_ENCODING)))
         {
             return false;
         }
@@ -174,6 +182,7 @@ class KmsKeyring implements Keyring {
         // OnDecrypt MUST attempt to decrypt each input encrypted data key in the input
         // encrypted data key list where the key provider info has a value equal to one
         // of the ARNs in this keyring's key IDs or the generator
-        return configuredKeyIds.contains(new String(encryptedDataKey.getProviderInformation(), PROVIDER_ENCODING));
+        return configuredKeyIds.contains(
+                AwsKmsCmkId.fromString(new String(encryptedDataKey.getProviderInformation(), PROVIDER_ENCODING)));
     }
 }

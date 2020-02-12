@@ -30,6 +30,7 @@ import com.amazonaws.encryptionsdk.MasterKey;
 import com.amazonaws.encryptionsdk.MasterKeyProvider;
 import com.amazonaws.encryptionsdk.exception.AwsCryptoException;
 import com.amazonaws.encryptionsdk.exception.UnsupportedProviderException;
+import com.amazonaws.encryptionsdk.keyrings.StandardKeyrings;
 import com.amazonaws.services.kms.AWSKMS;
 
 import static java.util.Collections.emptyList;
@@ -37,9 +38,12 @@ import static java.util.Collections.emptyList;
 /**
  * Represents a single Customer Master Key (CMK) and is used to encrypt/decrypt data with
  * {@link AwsCrypto}.
+ *
+ * @deprecated Replaced by {@code KmsKeyring}. See {@link StandardKeyrings}.
  */
+@Deprecated
 public final class KmsMasterKey extends MasterKey<KmsMasterKey> implements KmsMethods {
-    private final KmsDataKeyEncryptionDao dataKeyEncryptionDao_;
+    private final AwsKmsDataKeyEncryptionDao dataKeyEncryptionDao_;
     private final MasterKeyProvider<KmsMasterKey> sourceProvider_;
     private final String id_;
 
@@ -63,10 +67,10 @@ public final class KmsMasterKey extends MasterKey<KmsMasterKey> implements KmsMe
 
     static KmsMasterKey getInstance(final Supplier<AWSKMS> kms, final String id,
             final MasterKeyProvider<KmsMasterKey> provider) {
-        return new KmsMasterKey(new KmsDataKeyEncryptionDao(s -> kms.get(), emptyList()), id, provider);
+        return new KmsMasterKey(new AwsKmsDataKeyEncryptionDao(s -> kms.get(), emptyList()), id, provider);
     }
 
-    KmsMasterKey(final KmsDataKeyEncryptionDao dataKeyEncryptionDao, final String id, final MasterKeyProvider<KmsMasterKey> provider) {
+    KmsMasterKey(final AwsKmsDataKeyEncryptionDao dataKeyEncryptionDao, final String id, final MasterKeyProvider<KmsMasterKey> provider) {
         dataKeyEncryptionDao_ = dataKeyEncryptionDao;
         id_ = id;
         sourceProvider_ = provider;
@@ -86,7 +90,7 @@ public final class KmsMasterKey extends MasterKey<KmsMasterKey> implements KmsMe
     public DataKey<KmsMasterKey> generateDataKey(final CryptoAlgorithm algorithm,
             final Map<String, String> encryptionContext) {
         final DataKeyEncryptionDao.GenerateDataKeyResult gdkResult = dataKeyEncryptionDao_.generateDataKey(
-                getKeyId(), algorithm, encryptionContext);
+                AwsKmsCmkId.fromString(getKeyId()), algorithm, encryptionContext);
         return new DataKey<>(gdkResult.getPlaintextDataKey(),
                 gdkResult.getEncryptedDataKey().getEncryptedDataKey(),
                 gdkResult.getEncryptedDataKey().getProviderInformation(),
@@ -113,7 +117,8 @@ public final class KmsMasterKey extends MasterKey<KmsMasterKey> implements KmsMe
             final Map<String, String> encryptionContext,
             final DataKey<?> dataKey) {
         final SecretKey key = dataKey.getKey();
-        final EncryptedDataKey encryptedDataKey = dataKeyEncryptionDao_.encryptDataKey(id_, key, encryptionContext);
+        final EncryptedDataKey encryptedDataKey = dataKeyEncryptionDao_.encryptDataKey(
+                AwsKmsCmkId.fromString(id_), key, encryptionContext);
 
         return new DataKey<>(dataKey.getKey(),
                 encryptedDataKey.getEncryptedDataKey(),

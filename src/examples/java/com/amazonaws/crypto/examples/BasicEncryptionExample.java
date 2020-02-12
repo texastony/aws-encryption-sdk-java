@@ -19,13 +19,16 @@ import java.util.Collections;
 import java.util.Map;
 
 import com.amazonaws.encryptionsdk.AwsCrypto;
-import com.amazonaws.encryptionsdk.CryptoResult;
-import com.amazonaws.encryptionsdk.kms.KmsMasterKey;
-import com.amazonaws.encryptionsdk.kms.KmsMasterKeyProvider;
+import com.amazonaws.encryptionsdk.AwsCryptoResult;
+import com.amazonaws.encryptionsdk.DecryptRequest;
+import com.amazonaws.encryptionsdk.EncryptRequest;
+import com.amazonaws.encryptionsdk.keyrings.Keyring;
+import com.amazonaws.encryptionsdk.keyrings.StandardKeyrings;
+import com.amazonaws.encryptionsdk.kms.AwsKmsCmkId;
 
 /**
  * <p>
- * Encrypts and then decrypts data using an AWS KMS customer master key.
+ * Encrypts and then decrypts data using an AWS Key Management Service (AWS KMS) customer master key.
  *
  * <p>
  * Arguments:
@@ -39,48 +42,54 @@ public class BasicEncryptionExample {
     private static final byte[] EXAMPLE_DATA = "Hello World".getBytes(StandardCharsets.UTF_8);
 
     public static void main(final String[] args) {
-        final String keyArn = args[0];
-
-        encryptAndDecrypt(keyArn);
+        encryptAndDecrypt(AwsKmsCmkId.fromString(args[0]));
     }
 
-    static void encryptAndDecrypt(final String keyArn) {
+    static void encryptAndDecrypt(final AwsKmsCmkId keyArn) {
         // 1. Instantiate the SDK
         final AwsCrypto crypto = new AwsCrypto();
 
-        // 2. Instantiate a KMS master key provider
-        final KmsMasterKeyProvider masterKeyProvider = KmsMasterKeyProvider.builder().withKeysForEncryption(keyArn).build();
+        // 2. Instantiate a KMS keyring. Supply the key ARN for the generator key
+        //    that generates a data key. While using a key ARN is a best practice,
+        //    for encryption operations you can also use an alias name or alias ARN.
+        final Keyring keyring = StandardKeyrings.awsKms(keyArn);
 
         // 3. Create an encryption context
         //
-        // Most encrypted data should have an associated encryption context
-        // to protect integrity. This sample uses placeholder values.
+        //    Most encrypted data should have an associated encryption context
+        //    to protect integrity. This sample uses placeholder values.
         //
-        // For more information see:
-        // blogs.aws.amazon.com/security/post/Tx2LZ6WBJJANTNW/How-to-Protect-the-Integrity-of-Your-Encrypted-Data-by-Using-AWS-Key-Management
+        //    For more information see:
+        //    blogs.aws.amazon.com/security/post/Tx2LZ6WBJJANTNW/How-to-Protect-the-Integrity-of-Your-Encrypted-Data-by-Using-AWS-Key-Management
         final Map<String, String> encryptionContext = Collections.singletonMap("ExampleContextKey", "ExampleContextValue");
 
-        // 4. Encrypt the data
-        final CryptoResult<byte[], KmsMasterKey> encryptResult = crypto.encryptData(masterKeyProvider, EXAMPLE_DATA, encryptionContext);
+        // 4. Encrypt the data with the keyring and encryption context
+        final AwsCryptoResult<byte[]> encryptResult = crypto.encrypt(
+                EncryptRequest.builder()
+                    .keyring(keyring)
+                    .encryptionContext(encryptionContext)
+                    .plaintext(EXAMPLE_DATA).build());
         final byte[] ciphertext = encryptResult.getResult();
 
-        // 5. Decrypt the data
-        final CryptoResult<byte[], KmsMasterKey> decryptResult = crypto.decryptData(masterKeyProvider, ciphertext);
+        // 5. Decrypt the data. You can use the same keyring to encrypt and decrypt, but for decryption
+        //    the key IDs must be in the key ARN format.
+        final AwsCryptoResult<byte[]> decryptResult = crypto.decrypt(
+                DecryptRequest.builder()
+                        .keyring(keyring)
+                        .ciphertext(ciphertext).build());
 
-        // 6. Before verifying the plaintext, verify that the customer master key that
-        // was used in the encryption operation was the one supplied to the master key provider.
-        if (!decryptResult.getMasterKeyIds().get(0).equals(keyArn)) {
+        // 6. To verify the CMK that was actually used in the decrypt operation, inspect the keyring trace.
+        if(!decryptResult.getKeyringTrace().getEntries().get(0).getKeyName().equals(keyArn.toString())) {
             throw new IllegalStateException("Wrong key ID!");
         }
 
-        // 7. Also, verify that the encryption context in the result contains the
-        // encryption context supplied to the encryptData method. Because the
-        // SDK can add values to the encryption context, don't require that
-        // the entire context matches.
-        if (!encryptionContext.entrySet().stream()
-                .allMatch(e -> e.getValue().equals(decryptResult.getEncryptionContext().get(e.getKey())))) {
-            throw new IllegalStateException("Wrong Encryption Context!");
-        }
+        // 7.  To verify that the encryption context used to decrypt the data was the encryption context you expected,
+        //     examine the encryption context in the result. This helps to ensure that you decrypted the ciphertext that
+        //     you intended.
+        //
+        //     When verifying, test that your expected encryption context is a subset of the actual encryption context,
+        //     not an exact match. The Encryption SDK adds the signing key to the encryption context when appropriate.
+        assert decryptResult.getEncryptionContext().get("ExampleContextKey").equals("ExampleContextValue");
 
         // 8. Verify that the decrypted plaintext matches the original plaintext
         assert Arrays.equals(decryptResult.getResult(), EXAMPLE_DATA);

@@ -16,6 +16,7 @@ package com.amazonaws.encryptionsdk.kms;
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.encryptionsdk.exception.UnsupportedRegionException;
+import com.amazonaws.encryptionsdk.kms.StandardAwsKmsClientSuppliers.DefaultAwsKmsClientSupplierBuilder;
 import com.amazonaws.services.kms.AWSKMS;
 import com.amazonaws.services.kms.AWSKMSClientBuilder;
 import com.amazonaws.services.kms.model.AWSKMSException;
@@ -39,7 +40,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class AwsKmsClientSupplierTest {
+class StandardAwsKmsClientSuppliersTest {
 
     @Mock AWSKMSClientBuilder kmsClientBuilder;
     @Mock AWSKMS awskms;
@@ -58,7 +59,7 @@ class AwsKmsClientSupplierTest {
         when(kmsClientBuilder.withCredentials(credentialsProvider)).thenReturn(kmsClientBuilder);
         when(kmsClientBuilder.build()).thenReturn(awskms);
 
-        AwsKmsClientSupplier supplier = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
+        AwsKmsClientSupplier supplier = new DefaultAwsKmsClientSupplierBuilder(kmsClientBuilder)
                 .credentialsProvider(credentialsProvider)
                 .clientConfiguration(clientConfiguration)
                 .build();
@@ -71,63 +72,8 @@ class AwsKmsClientSupplierTest {
     }
 
     @Test
-    void testAllowedAndExcludedRegions() {
-        AwsKmsClientSupplier supplierWithDefaultValues = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
-                .build();
-
-        when(kmsClientBuilder.withRegion(REGION_1)).thenReturn(kmsClientBuilder);
-        when(kmsClientBuilder.build()).thenReturn(awskms);
-
-        assertNotNull(supplierWithDefaultValues.getClient(REGION_1));
-
-        AwsKmsClientSupplier supplierWithAllowed = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
-                .allowedRegions(Collections.singleton(REGION_1))
-                .build();
-
-        when(kmsClientBuilder.withRegion(REGION_1)).thenReturn(kmsClientBuilder);
-        when(kmsClientBuilder.build()).thenReturn(awskms);
-
-        assertNotNull(supplierWithAllowed.getClient(REGION_1));
-        assertThrows(UnsupportedRegionException.class, () -> supplierWithAllowed.getClient(REGION_2));
-
-        AwsKmsClientSupplier supplierWithExcluded = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
-                .excludedRegions(Collections.singleton(REGION_1))
-                .build();
-
-        when(kmsClientBuilder.withRegion(REGION_2)).thenReturn(kmsClientBuilder);
-        when(kmsClientBuilder.build()).thenReturn(awskms);
-
-        assertThrows(UnsupportedRegionException.class, () -> supplierWithExcluded.getClient(REGION_1));
-        assertNotNull(supplierWithExcluded.getClient(REGION_2));
-
-        assertThrows(IllegalArgumentException.class, () -> new AwsKmsClientSupplier.Builder(kmsClientBuilder)
-                .allowedRegions(Collections.singleton(REGION_1))
-                .excludedRegions(Collections.singleton(REGION_2))
-                .build());
-    }
-
-    @Test
-    void testClientCachingDisabled() {
-        AwsKmsClientSupplier supplierCachingDisabled = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
-                .clientCaching(false)
-                .build();
-
-        when(kmsClientBuilder.withRegion(REGION_1)).thenReturn(kmsClientBuilder);
-        when(kmsClientBuilder.build()).thenReturn(awskms);
-
-        AWSKMS uncachedClient = supplierCachingDisabled.getClient(REGION_1);
-        verify(kmsClientBuilder, times(1)).build();
-
-        when(awskms.encrypt(encryptRequest)).thenReturn(new EncryptResult());
-
-        uncachedClient.encrypt(encryptRequest);
-        supplierCachingDisabled.getClient(REGION_1);
-        verify(kmsClientBuilder, times(2)).build();
-    }
-
-    @Test
     void testClientCaching() {
-        AwsKmsClientSupplier supplier = new AwsKmsClientSupplier.Builder(kmsClientBuilder)
+        AwsKmsClientSupplier supplier = new DefaultAwsKmsClientSupplierBuilder(kmsClientBuilder)
                 .build();
 
         when(kmsClientBuilder.withRegion(REGION_1)).thenReturn(kmsClientBuilder);
@@ -183,5 +129,47 @@ class AwsKmsClientSupplierTest {
         assertEquals(awskms, AwsKmsClientSupplier.getClientByKeyId(AwsKmsCmkId.fromString(aliasArn), s -> awskms));
         assertEquals(awskms, AwsKmsClientSupplier.getClientByKeyId(AwsKmsCmkId.fromString(alias), s -> awskms));
         assertEquals(awskms, AwsKmsClientSupplier.getClientByKeyId(AwsKmsCmkId.fromString(keyId), s -> awskms));
+    }
+
+    @Test
+    void testAllowedRegions() {
+        AwsKmsClientSupplier supplierWithDefaultValues = new DefaultAwsKmsClientSupplierBuilder(kmsClientBuilder)
+                .build();
+
+        when(kmsClientBuilder.withRegion(REGION_1)).thenReturn(kmsClientBuilder);
+        when(kmsClientBuilder.build()).thenReturn(awskms);
+
+        assertNotNull(supplierWithDefaultValues.getClient(REGION_1));
+
+        AwsKmsClientSupplier supplierWithAllowed = StandardAwsKmsClientSuppliers
+                .allowRegionsBuilder(Collections.singleton(REGION_1))
+                .baseClientSupplier(new DefaultAwsKmsClientSupplierBuilder(kmsClientBuilder).build()).build();
+
+        when(kmsClientBuilder.withRegion(REGION_1)).thenReturn(kmsClientBuilder);
+        when(kmsClientBuilder.build()).thenReturn(awskms);
+
+        assertNotNull(supplierWithAllowed.getClient(REGION_1));
+        assertThrows(UnsupportedRegionException.class, () -> supplierWithAllowed.getClient(REGION_2));
+    }
+
+    @Test
+    void testDeniedRegions() {
+        AwsKmsClientSupplier supplierWithDefaultValues = new DefaultAwsKmsClientSupplierBuilder(kmsClientBuilder)
+                .build();
+
+        when(kmsClientBuilder.withRegion(REGION_1)).thenReturn(kmsClientBuilder);
+        when(kmsClientBuilder.build()).thenReturn(awskms);
+
+        assertNotNull(supplierWithDefaultValues.getClient(REGION_1));
+
+        AwsKmsClientSupplier supplierWithDenied = StandardAwsKmsClientSuppliers
+                .denyRegionsBuilder(Collections.singleton(REGION_1))
+                .baseClientSupplier(new DefaultAwsKmsClientSupplierBuilder(kmsClientBuilder).build()).build();
+
+        when(kmsClientBuilder.withRegion(REGION_2)).thenReturn(kmsClientBuilder);
+        when(kmsClientBuilder.build()).thenReturn(awskms);
+
+        assertThrows(UnsupportedRegionException.class, () -> supplierWithDenied.getClient(REGION_1));
+        assertNotNull(supplierWithDenied.getClient(REGION_2));
     }
 }

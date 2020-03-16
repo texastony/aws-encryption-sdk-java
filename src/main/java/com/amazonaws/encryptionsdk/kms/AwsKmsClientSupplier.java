@@ -13,26 +13,13 @@
 
 package com.amazonaws.encryptionsdk.kms;
 
-import com.amazonaws.ClientConfiguration;
 import com.amazonaws.arn.Arn;
-import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.encryptionsdk.exception.UnsupportedRegionException;
 import com.amazonaws.services.kms.AWSKMS;
-import com.amazonaws.services.kms.AWSKMSClientBuilder;
-import com.amazonaws.services.kms.model.AWSKMSException;
 
 import javax.annotation.Nullable;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Proxy;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.Validate.isTrue;
-import static org.apache.commons.lang3.Validate.notEmpty;
 
 /**
  * Represents a function that accepts an AWS region and returns an {@code AWSKMS} client for that region. The
@@ -52,15 +39,6 @@ public interface AwsKmsClientSupplier {
     AWSKMS getClient(@Nullable String regionId) throws UnsupportedRegionException;
 
     /**
-     * Gets a Builder for constructing an AwsKmsClientSupplier
-     *
-     * @return The builder
-     */
-    static Builder builder() {
-        return new Builder(AWSKMSClientBuilder.standard());
-    }
-
-    /**
      * Parses region from the given key id (if possible) and passes that region to the
      * given clientSupplier to produce an {@code AWSKMS} client.
      *
@@ -77,157 +55,5 @@ public interface AwsKmsClientSupplier {
         }
 
         return clientSupplier.getClient(null);
-    }
-
-    /**
-     * Builder to construct an AwsKmsClientSupplier given various
-     * optional settings.
-     */
-    class Builder {
-
-        private AWSCredentialsProvider credentialsProvider;
-        private ClientConfiguration clientConfiguration;
-        private Set<String> allowedRegions = Collections.emptySet();
-        private Set<String> excludedRegions = Collections.emptySet();
-        private boolean clientCachingEnabled = true;
-        private final Map<String, AWSKMS> clientsCache = new HashMap<>();
-        private static final Set<String> AWSKMS_METHODS = new HashSet<>();
-        private AWSKMSClientBuilder awsKmsClientBuilder;
-
-        static {
-            AWSKMS_METHODS.add("generateDataKey");
-            AWSKMS_METHODS.add("encrypt");
-            AWSKMS_METHODS.add("decrypt");
-        }
-
-        Builder(AWSKMSClientBuilder awsKmsClientBuilder) {
-            this.awsKmsClientBuilder = awsKmsClientBuilder;
-        }
-
-        public AwsKmsClientSupplier build() {
-            isTrue(allowedRegions.isEmpty() || excludedRegions.isEmpty(),
-                    "Either allowed regions or excluded regions may be set, not both.");
-
-            return regionId -> {
-                if (!allowedRegions.isEmpty() && !allowedRegions.contains(regionId)) {
-                    throw new UnsupportedRegionException(String.format("Region %s is not in the list of allowed regions %s",
-                            regionId, allowedRegions));
-                }
-
-                if (excludedRegions.contains(regionId)) {
-                    throw new UnsupportedRegionException(String.format("Region %s is in the list of excluded regions %s",
-                            regionId, excludedRegions));
-                }
-
-                if (clientsCache.containsKey(regionId)) {
-                    return clientsCache.get(regionId);
-                }
-
-                if (credentialsProvider != null) {
-                    awsKmsClientBuilder = awsKmsClientBuilder.withCredentials(credentialsProvider);
-                }
-
-                if (clientConfiguration != null) {
-                    awsKmsClientBuilder = awsKmsClientBuilder.withClientConfiguration(clientConfiguration);
-                }
-
-                if (regionId != null) {
-                    awsKmsClientBuilder = awsKmsClientBuilder.withRegion(regionId);
-                }
-
-                AWSKMS client = awsKmsClientBuilder.build();
-
-                if (clientCachingEnabled) {
-                    client = newCachingProxy(client, regionId);
-                }
-
-                return client;
-            };
-        }
-
-        /**
-         * Sets the AWSCredentialsProvider used by the client.
-         *
-         * @param credentialsProvider New AWSCredentialsProvider to use.
-         */
-        public Builder credentialsProvider(AWSCredentialsProvider credentialsProvider) {
-            this.credentialsProvider = credentialsProvider;
-            return this;
-        }
-
-        /**
-         * Sets the ClientConfiguration to be used by the client.
-         *
-         * @param clientConfiguration Custom configuration to use.
-         */
-        public Builder clientConfiguration(ClientConfiguration clientConfiguration) {
-            this.clientConfiguration = clientConfiguration;
-            return this;
-        }
-
-        /**
-         * Sets the AWS regions that the client supplier is permitted to use.
-         *
-         * @param regions The set of regions.
-         */
-        public Builder allowedRegions(Set<String> regions) {
-            notEmpty(regions, "At least one region is required");
-            this.allowedRegions = Collections.unmodifiableSet(new HashSet<>(regions));
-            return this;
-        }
-
-        /**
-         * Sets the AWS regions that the client supplier is not permitted to use.
-         *
-         * @param regions The set of regions.
-         */
-        public Builder excludedRegions(Set<String> regions) {
-            requireNonNull(regions, "regions is required");
-            this.excludedRegions = Collections.unmodifiableSet(new HashSet<>(regions));
-            return this;
-        }
-
-        /**
-         * When set to false, disables the AWSKMS client for each region from being cached and reused.
-         * By default, client caching is enabled.
-         *
-         * @param enabled Whether or not caching is enabled.
-         */
-        public Builder clientCaching(boolean enabled) {
-            this.clientCachingEnabled = enabled;
-            return this;
-        }
-
-        /**
-         * Creates a proxy for the AWSKMS client that will populate the client into the client cache
-         * after an AWS KMS method successfully completes or an AWS KMS exception occurs. This is to prevent a
-         * a malicious user from causing a local resource DOS by sending ciphertext with a large number
-         * of spurious regions, thereby filling the cache with regions and exhausting resources.
-         *
-         * @param client   The client to proxy
-         * @param regionId The region the client is associated with
-         * @return The proxy
-         */
-        private AWSKMS newCachingProxy(AWSKMS client, String regionId) {
-            return (AWSKMS) Proxy.newProxyInstance(
-                    AWSKMS.class.getClassLoader(),
-                    new Class[]{AWSKMS.class},
-                    (proxy, method, methodArgs) -> {
-                        try {
-                            final Object result = method.invoke(client, methodArgs);
-                            if (AWSKMS_METHODS.contains(method.getName())) {
-                                clientsCache.put(regionId, client);
-                            }
-                            return result;
-                        } catch (InvocationTargetException e) {
-                            if (e.getTargetException() instanceof AWSKMSException &&
-                                    AWSKMS_METHODS.contains(method.getName())) {
-                                clientsCache.put(regionId, client);
-                            }
-
-                            throw e.getTargetException();
-                        }
-                    });
-        }
     }
 }

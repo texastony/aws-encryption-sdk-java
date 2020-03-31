@@ -1,17 +1,7 @@
-/*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except
- * in compliance with the License. A copy of the License is located at
- *
- * http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
-package com.amazonaws.crypto.examples.datakeycaching;
+package com.amazonaws.crypto.examples.legacy;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -115,20 +105,20 @@ public class LambdaDecryptAndWriteExample implements RequestHandler<KinesisEvent
             ByteBuffer ciphertextBuffer = record.getKinesis().getData();
             byte[] ciphertext = BinaryUtils.copyAllBytesFrom(ciphertextBuffer);
 
-            // Decrypt and unpack record
+            // Decrypt and unpack record.
             AwsCryptoResult<byte[]> plaintextResult = crypto_.decrypt(
                     DecryptRequest.builder()
                             .cryptoMaterialsManager(cachingMaterialsManager_)
                             .ciphertext(ciphertext).build());
 
-            // Verify the encryption context value
+            // Verify the encryption context value.
             String streamArn = record.getEventSourceARN();
             String streamName = streamArn.substring(streamArn.indexOf("/") + 1);
             if (!streamName.equals(plaintextResult.getEncryptionContext().get("stream"))) {
                 throw new IllegalStateException("Wrong Encryption Context!");
             }
 
-            // Write record to DynamoDB
+            // Write record to DynamoDB.
             String jsonItem = new String(plaintextResult.getResult(), StandardCharsets.UTF_8);
             table_.putItem(Item.fromJSON(jsonItem));
         }

@@ -1,17 +1,7 @@
-/*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except
- * in compliance with the License. A copy of the License is located at
- *
- * http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
-package com.amazonaws.crypto.examples.datakeycaching;
+package com.amazonaws.crypto.examples.legacy;
 
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.encryptionsdk.AwsCrypto;
@@ -61,7 +51,7 @@ public class MultiRegionRecordPusherExample {
 
         final DefaultAWSCredentialsProviderChain credentialsProvider = new DefaultAWSCredentialsProviderChain();
 
-        // Build AwsKmsKeyring and AmazonKinesisClient objects for each target Region
+        // Build AwsKmsKeyring and AmazonKinesisClient objects for each target Region.
         final List<Keyring> keyrings = new ArrayList<>();
 
         for (Region region : regions) {
@@ -98,10 +88,10 @@ public class MultiRegionRecordPusherExample {
         String partitionKey = UUID.randomUUID().toString();
         Map<String, String> encryptionContext = Collections.singletonMap("stream", streamName_);
 
-        // JSON serialize data
+        // JSON serialize data.
         String jsonData = Jackson.toJsonString(data);
 
-        // Encrypt data
+        // Encrypt data.
         AwsCryptoResult<byte[]> result = crypto_.encrypt(
                 EncryptRequest.builder()
                         .cryptoMaterialsManager(cachingMaterialsManager_)
@@ -111,7 +101,7 @@ public class MultiRegionRecordPusherExample {
 
         byte[] encryptedData = result.getResult();
 
-        // Put records to Kinesis stream in all Regions
+        // Put records to Kinesis stream in all Regions.
         for (AmazonKinesis regionalKinesisClient : kinesisClients_) {
             regionalKinesisClient.putRecord(
                     streamName_,

@@ -44,7 +44,7 @@ class RsaJceKeyCipher extends JceKeyCipher {
     private final String transformation_;
 
     RsaJceKeyCipher(PublicKey wrappingKey, PrivateKey unwrappingKey, String transformation) {
-        super(wrappingKey, unwrappingKey, false);
+        super(wrappingKey, unwrappingKey);
 
         final Matcher matcher = SUPPORTED_TRANSFORMATIONS.matcher(transformation);
         if (matcher.matches()) {

@@ -21,7 +21,6 @@ import com.amazonaws.encryptionsdk.exception.AwsCryptoException;
 import com.amazonaws.encryptionsdk.exception.UnsupportedProviderException;
 import com.amazonaws.encryptionsdk.internal.JceKeyCipher;
 import com.amazonaws.encryptionsdk.internal.Utils;
-import com.amazonaws.encryptionsdk.keyrings.StandardKeyrings;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -38,10 +37,7 @@ import java.util.Map;
  * Represents a {@link MasterKey} backed by one (or more) JCE {@link Key}s. Instances of this should
  * only be acquired using {@link #getInstance(SecretKey, String, String, String)} or
  * {@link #getInstance(PublicKey, PrivateKey, String, String, String)}.
- *
- * @deprecated Replaced by {@code RawAesKeyring} and {@code RawRsaKeyring}. See {@link StandardKeyrings}.
  */
-@Deprecated
 public class JceMasterKey extends MasterKey<JceMasterKey> {
     private final String providerName_;
     private final String keyId_;
@@ -106,16 +102,6 @@ public class JceMasterKey extends MasterKey<JceMasterKey> {
     @Override
     public String getKeyId() {
         return keyId_;
-    }
-
-    /**
-     * Returns true if the underlying key cipher supports signing and
-     * verification of the encryption context.
-     *
-     * @return True if encryption context signing/verification is supported.
-     */
-    public boolean isEncryptionContextSigned() {
-        return jceKeyCipher_.isEncryptionContextSigned();
     }
 
     @Override

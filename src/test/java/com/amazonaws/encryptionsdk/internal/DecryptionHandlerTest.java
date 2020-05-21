@@ -16,7 +16,6 @@ package com.amazonaws.encryptionsdk.internal;
 import java.util.Collections;
 import java.util.Map;
 
-import com.amazonaws.encryptionsdk.keyrings.Keyring;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -30,16 +29,12 @@ import com.amazonaws.encryptionsdk.model.CiphertextType;
 import com.amazonaws.encryptionsdk.model.EncryptionMaterialsRequest;
 import com.amazonaws.encryptionsdk.model.EncryptionMaterials;
 
-import static org.junit.Assert.assertEquals;
-
 public class DecryptionHandlerTest {
     private StaticMasterKey masterKeyProvider_;
-    private Keyring keyring;
 
     @Before
     public void init() {
         masterKeyProvider_ = new StaticMasterKey("testmaterial");
-        keyring = new TestKeyring("testmaterial");
     }
 
     @Test(expected = NullPointerException.class)
@@ -144,14 +139,5 @@ public class DecryptionHandlerTest {
         final byte[] in = new byte[1];
         final byte[] out = new byte[1];
         decryptionHandler.processBytes(in, -1, in.length, out, 0);
-    }
-
-    @Test
-    public void testNullMasterKey() {
-        final DecryptionHandler decryptionHandler = DecryptionHandler.create(new DefaultCryptoMaterialsManager(keyring));
-        final byte[] out = new byte[1];
-        final byte[] testHeaders = getTestHeaders();
-        decryptionHandler.processBytes(getTestHeaders(), 0, testHeaders.length, out, 0);
-        assertEquals(0, decryptionHandler.getMasterKeys().size());
     }
 }

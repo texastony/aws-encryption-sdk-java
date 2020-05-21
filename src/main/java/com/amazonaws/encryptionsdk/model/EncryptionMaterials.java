@@ -1,11 +1,5 @@
 package com.amazonaws.encryptionsdk.model;
 
-import com.amazonaws.encryptionsdk.CryptoAlgorithm;
-import com.amazonaws.encryptionsdk.MasterKey;
-import com.amazonaws.encryptionsdk.keyrings.Keyring;
-import com.amazonaws.encryptionsdk.keyrings.KeyringTrace;
-import com.amazonaws.encryptionsdk.keyrings.KeyringTraceEntry;
-
 import javax.crypto.SecretKey;
 import java.security.PrivateKey;
 import java.util.ArrayList;
@@ -15,10 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static java.util.Collections.unmodifiableList;
-import static java.util.Collections.unmodifiableMap;
-import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.Validate.isTrue;
+import com.amazonaws.encryptionsdk.CryptoAlgorithm;
+import com.amazonaws.encryptionsdk.MasterKey;
 
 /**
  * Contains the cryptographic materials needed for an encryption operation.
@@ -32,7 +24,6 @@ public final class EncryptionMaterials {
     private final SecretKey cleartextDataKey;
     private final PrivateKey trailingSignatureKey;
     private final List<MasterKey> masterKeys;
-    private final KeyringTrace keyringTrace;
 
     private EncryptionMaterials(Builder b) {
         this.algorithm = b.algorithm;
@@ -41,7 +32,6 @@ public final class EncryptionMaterials {
         this.cleartextDataKey = b.cleartextDataKey;
         this.trailingSignatureKey = b.trailingSignatureKey;
         this.masterKeys = b.getMasterKeys();
-        this.keyringTrace = b.keyringTrace;
     }
 
     public Builder toBuilder() {
@@ -75,63 +65,11 @@ public final class EncryptionMaterials {
     }
 
     /**
-     * Creates a new {@code EncryptionMaterials} instance based on this instance with the addition of the
-     * provided encrypted data key and keyring trace entry.
-     *
-     * @param encryptedDataKey  The encrypted data key to add.
-     * @param keyringTraceEntry The keyring trace entry recording this action.
-     * @return The new {@code EncryptionMaterials} instance.
-     */
-    public EncryptionMaterials withEncryptedDataKey(KeyBlob encryptedDataKey, KeyringTraceEntry keyringTraceEntry) {
-        requireNonNull(encryptedDataKey, "encryptedDataKey is required");
-        requireNonNull(keyringTraceEntry, "keyringTraceEntry is required");
-
-        final List<KeyBlob> encryptedDataKeys = new ArrayList<>(getEncryptedDataKeys());
-        encryptedDataKeys.add(encryptedDataKey);
-
-        return toBuilder()
-                .setEncryptedDataKeys(encryptedDataKeys)
-                .setKeyringTrace(keyringTrace.with(keyringTraceEntry))
-                .build();
-    }
-
-    /**
      * The cleartext data key to use for encrypting this message. Note that this is the data key prior to
      * any key derivation required by the crypto algorithm in use.
      */
     public SecretKey getCleartextDataKey() {
         return cleartextDataKey;
-    }
-
-    /**
-     * Creates a new {@code EncryptionMaterials} instance based on this instance with the addition of the
-     * provided cleartext data key and keyring trace entry. The cleartext data key must not already be populated.
-     *
-     * @param cleartextDataKey  The cleartext data key.
-     * @param keyringTraceEntry The keyring trace entry recording this action.
-     * @return The new {@code EncryptionMaterials} instance.
-     */
-    public EncryptionMaterials withCleartextDataKey(SecretKey cleartextDataKey, KeyringTraceEntry keyringTraceEntry) {
-        if (hasCleartextDataKey()) {
-            throw new IllegalStateException("cleartextDataKey was already populated");
-        }
-        requireNonNull(cleartextDataKey, "cleartextDataKey is required");
-        requireNonNull(keyringTraceEntry, "keyringTraceEntry is required");
-        validateCleartextDataKey(algorithm, cleartextDataKey);
-
-        return toBuilder()
-                .setCleartextDataKey(cleartextDataKey)
-                .setKeyringTrace(keyringTrace.with(keyringTraceEntry))
-                .build();
-    }
-
-    /**
-     * Returns true if a cleartext data key has been populated.
-     *
-     * @return True is a cleartext data key has been populated, false otherwise.
-     */
-    public boolean hasCleartextDataKey() {
-        return this.cleartextDataKey != null;
     }
 
     /**
@@ -148,34 +86,9 @@ public final class EncryptionMaterials {
 
     /**
      * Contains a list of all MasterKeys that could decrypt this message.
-     *
-     * @deprecated {@link MasterKey}s have been replaced by {@link Keyring}s
      */
-    @Deprecated
     public List<MasterKey> getMasterKeys() {
         return masterKeys;
-    }
-
-    /**
-     * A keyring trace containing all of the actions that keyrings have taken on this set of encryption materials.
-     */
-    public KeyringTrace getKeyringTrace() {
-        return keyringTrace;
-    }
-
-    /**
-     * Validates that the given plaintext data key fits the specification
-     * for the data key algorithm specified in the given algorithm suite.
-     */
-    private void validateCleartextDataKey(CryptoAlgorithm algorithmSuite, SecretKey cleartextDataKey) throws IllegalArgumentException {
-        if (algorithmSuite != null && cleartextDataKey != null) {
-            isTrue(algorithmSuite.getDataKeyLength() == cleartextDataKey.getEncoded().length,
-                    String.format("Incorrect data key length. Expected %s but got %s",
-                            algorithmSuite.getDataKeyLength(), cleartextDataKey.getEncoded().length));
-            isTrue(algorithmSuite.getDataKeyAlgo().equalsIgnoreCase(cleartextDataKey.getAlgorithm()),
-                    String.format("Incorrect data key algorithm. Expected %s but got %s",
-                            algorithmSuite.getDataKeyAlgo(), cleartextDataKey.getAlgorithm()));
-        }
     }
 
     @Override public boolean equals(Object o) {
@@ -187,23 +100,21 @@ public final class EncryptionMaterials {
                 Objects.equals(encryptedDataKeys, that.encryptedDataKeys) &&
                 Objects.equals(cleartextDataKey, that.cleartextDataKey) &&
                 Objects.equals(trailingSignatureKey, that.trailingSignatureKey) &&
-                Objects.equals(masterKeys, that.masterKeys) &&
-                Objects.equals(keyringTrace, that.keyringTrace);
+                Objects.equals(masterKeys, that.masterKeys);
     }
 
     @Override public int hashCode() {
         return Objects.hash(algorithm, encryptionContext, encryptedDataKeys, cleartextDataKey, trailingSignatureKey,
-                masterKeys, keyringTrace);
+                            masterKeys);
     }
 
     public static class Builder {
         private CryptoAlgorithm algorithm;
         private Map<String, String> encryptionContext = Collections.emptyMap();
-        private List<KeyBlob> encryptedDataKeys = Collections.emptyList();
+        private List<KeyBlob> encryptedDataKeys = null;
         private SecretKey cleartextDataKey;
         private PrivateKey trailingSignatureKey;
         private List<MasterKey> masterKeys = Collections.emptyList();
-        private KeyringTrace keyringTrace = KeyringTrace.EMPTY_TRACE;
 
         private Builder() {}
 
@@ -214,7 +125,6 @@ public final class EncryptionMaterials {
             cleartextDataKey = r.cleartextDataKey;
             trailingSignatureKey = r.trailingSignatureKey;
             setMasterKeys(r.masterKeys);
-            keyringTrace = r.keyringTrace;
         }
 
         public EncryptionMaterials build() {
@@ -235,7 +145,7 @@ public final class EncryptionMaterials {
         }
 
         public Builder setEncryptionContext(Map<String, String> encryptionContext) {
-            this.encryptionContext = unmodifiableMap(new HashMap<>(encryptionContext));
+            this.encryptionContext = Collections.unmodifiableMap(new HashMap<>(encryptionContext));
             return this;
         }
 
@@ -244,7 +154,7 @@ public final class EncryptionMaterials {
         }
 
         public Builder setEncryptedDataKeys(List<KeyBlob> encryptedDataKeys) {
-            this.encryptedDataKeys = unmodifiableList(new ArrayList<>(encryptedDataKeys));
+            this.encryptedDataKeys = Collections.unmodifiableList(new ArrayList<>(encryptedDataKeys));
             return this;
         }
 
@@ -266,23 +176,12 @@ public final class EncryptionMaterials {
             return this;
         }
 
-        @Deprecated
         public List<MasterKey> getMasterKeys() {
             return masterKeys;
         }
 
-        @Deprecated
         public Builder setMasterKeys(List<MasterKey> masterKeys) {
-            this.masterKeys = unmodifiableList(new ArrayList<>(masterKeys));
-            return this;
-        }
-
-        public KeyringTrace getKeyringTrace() {
-            return keyringTrace;
-        }
-
-        public Builder setKeyringTrace(KeyringTrace keyringTrace) {
-            this.keyringTrace = keyringTrace;
+            this.masterKeys = Collections.unmodifiableList(new ArrayList<>(masterKeys));
             return this;
         }
     }

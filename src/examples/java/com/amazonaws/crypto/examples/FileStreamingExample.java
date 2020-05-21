@@ -1,6 +1,17 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: Apache-2.0
-package com.amazonaws.crypto.examples.legacy;
+/*
+ * Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except
+ * in compliance with the License. A copy of the License is located at
+ * 
+ * http://aws.amazon.com/apache2.0
+ * 
+ * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+
+package com.amazonaws.crypto.examples;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -21,10 +32,6 @@ import com.amazonaws.util.IOUtils;
 /**
  * <p>
  * Encrypts and then decrypts a file under a random key.
- * NOTE: Master key providers are deprecated and replaced by keyrings.
- *       We keep these older examples as reference material,
- *       but we recommend that you use the new examples in examples/keyring
- *       The new examples reflect our current guidance for using the library.
  *
  * <p>
  * Arguments:
@@ -42,20 +49,20 @@ public class FileStreamingExample {
     public static void main(String[] args) throws IOException {
         srcFile = args[0];
 
-        // In this example, we generate a random key. In practice,
-        // you would get a key from an existing store.
+        // In this example, we generate a random key. In practice, 
+        // you would get a key from an existing store
         SecretKey cryptoKey = retrieveEncryptionKey();
 
-        // Create a JCE master key provider using the random key and an AES-GCM encryption algorithm.
+        // Create a JCE master key provider using the random key and an AES-GCM encryption algorithm
         JceMasterKey masterKey = JceMasterKey.getInstance(cryptoKey, "Example", "RandomKey", "AES/GCM/NoPadding");
 
-        // Instantiate the AWS Encryption SDK.
+        // Instantiate the SDK
         AwsCrypto crypto = new AwsCrypto();
 
-        // Create an encryption context to identify this ciphertext.
+        // Create an encryption context to identify this ciphertext
         Map<String, String> context = Collections.singletonMap("Example", "FileStreaming");
 
-        // Because the file might be to large to load into memory, we stream the data, instead of
+        // Because the file might be to large to load into memory, we stream the data, instead of 
         //loading it all at once.
         FileInputStream in = new FileInputStream(srcFile);
         CryptoInputStream<JceMasterKey> encryptingStream = crypto.createEncryptingStream(masterKey, in, context);
@@ -73,7 +80,7 @@ public class FileStreamingExample {
             throw new IllegalStateException("Bad encryption context");
         }
 
-        // Return the plaintext data.
+        // Return the plaintext data
         out = new FileOutputStream(srcFile + ".decrypted");
         IOUtils.copy(decryptingStream, out);
         decryptingStream.close();
@@ -81,7 +88,7 @@ public class FileStreamingExample {
     }
 
     /**
-     * In practice, this key would be saved in a secure location.
+     * In practice, this key would be saved in a secure location. 
      * For this demo, we generate a new random key for each operation.
      */
     private static SecretKey retrieveEncryptionKey() {

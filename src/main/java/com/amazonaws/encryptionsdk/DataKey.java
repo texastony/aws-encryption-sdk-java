@@ -20,10 +20,7 @@ import javax.crypto.SecretKey;
  *
  * @param <M>
  *            the type of {@link MasterKey} used to protect this {@code DataKey}.
- * @deprecated This type depends on the deprecated {@link MasterKey} type. Use {@link SecretKey} or
- *             {@link EncryptedDataKey} instead.
  */
-@Deprecated
 public class DataKey<M extends MasterKey<M>> implements EncryptedDataKey {
     private final byte[] providerInformation_;
     private final byte[] encryptedDataKey_;

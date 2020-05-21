@@ -13,9 +13,8 @@
 
 package com.amazonaws.encryptionsdk;
 
-import static com.amazonaws.encryptionsdk.TestUtils.assertNullChecks;
+import static com.amazonaws.encryptionsdk.FastTestsOnlySuite.isFastTestSuiteActive;
 import static com.amazonaws.encryptionsdk.TestUtils.assertThrows;
-import static com.amazonaws.encryptionsdk.TestUtils.isFastTestsOnly;
 import static java.util.Collections.singletonMap;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -38,8 +37,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import com.amazonaws.encryptionsdk.internal.TestKeyring;
-import com.amazonaws.encryptionsdk.keyrings.Keyring;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -58,13 +56,11 @@ import com.amazonaws.encryptionsdk.model.EncryptionMaterialsRequest;
 
 public class AwsCryptoTest {
     private StaticMasterKey masterKeyProvider;
-    private Keyring keyring;
     private AwsCrypto encryptionClient_;
 
     @Before
     public void init() {
         masterKeyProvider = spy(new StaticMasterKey("testmaterial"));
-        keyring = spy(new TestKeyring("testmaterial"));
 
         encryptionClient_ = new AwsCrypto();
         encryptionClient_.setEncryptionAlgorithm(CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256);
@@ -91,26 +87,6 @@ public class AwsCryptoTest {
         assertArrayEquals("Bad encrypt/decrypt for " + cryptoAlg, plaintextBytes, decryptedText);
     }
 
-    private void doEncryptDecryptWithKeyring(final CryptoAlgorithm cryptoAlg, final int byteSize, final int frameSize) {
-        final byte[] plaintextBytes = new byte[byteSize];
-
-        final Map<String, String> encryptionContext = new HashMap<>(1);
-        encryptionContext.put("ENC1", "Encrypt-decrypt-keyring test with %d" + byteSize);
-
-        encryptionClient_.setEncryptionAlgorithm(cryptoAlg);
-        encryptionClient_.setEncryptionFrameSize(frameSize);
-
-        final byte[] cipherText = encryptionClient_.encrypt(request -> request
-                .keyring(keyring)
-                .encryptionContext(encryptionContext)
-                .plaintext(plaintextBytes)).getResult();
-        final byte[] decryptedText = encryptionClient_.decrypt(request -> request
-                .keyring(keyring)
-                .ciphertext(cipherText)).getResult();
-
-        assertArrayEquals("Bad encrypt/decrypt for " + cryptoAlg, plaintextBytes, decryptedText);
-    }
-
     private void doTamperedEncryptDecrypt(final CryptoAlgorithm cryptoAlg, final int byteSize, final int frameSize) {
         final byte[] plaintextBytes = new byte[byteSize];
 
@@ -125,29 +101,15 @@ public class AwsCryptoTest {
                 plaintextBytes,
                 encryptionContext).getResult();
         cipherText[cipherText.length - 2] ^= (byte) 0xff;
-
-        assertThrows(BadCiphertextException.class, () -> encryptionClient_.decryptData(
-                masterKeyProvider,
-                cipherText));
-    }
-
-    private void doTamperedEncryptDecryptWithKeyring(final CryptoAlgorithm cryptoAlg, final int byteSize, final int frameSize) {
-        final byte[] plaintextBytes = new byte[byteSize];
-
-        final Map<String, String> encryptionContext = new HashMap<>(1);
-        encryptionContext.put("ENC1", "Encrypt-decrypt-keyring test with %d" + byteSize);
-
-        encryptionClient_.setEncryptionAlgorithm(cryptoAlg);
-        encryptionClient_.setEncryptionFrameSize(frameSize);
-
-        final byte[] cipherText = encryptionClient_.encrypt(EncryptRequest.builder()
-                .keyring(keyring)
-                .plaintext(plaintextBytes).build()).getResult();
-        cipherText[cipherText.length - 2] ^= (byte) 0xff;
-
-        assertThrows(BadCiphertextException.class, () -> encryptionClient_.decrypt(DecryptRequest.builder()
-                .keyring(keyring)
-                .ciphertext(cipherText).build()));
+        try {
+            encryptionClient_.decryptData(
+                    masterKeyProvider,
+                    cipherText
+                    ).getResult();
+            Assert.fail("Expected BadCiphertextException");
+        } catch (final BadCiphertextException ex) {
+            // Expected exception
+        }
     }
 
     private void doEncryptDecryptWithParsedCiphertext(final int byteSize, final int frameSize) {
@@ -193,13 +155,12 @@ public class AwsCryptoTest {
                 for (int j = 0; j < bytesToTest.length; j++) {
                     final int byteSize = bytesToTest[j];
 
-                    if (byteSize > 500_000 && isFastTestsOnly()) {
+                    if (byteSize > 500_000 && isFastTestSuiteActive()) {
                         continue;
                     }
 
                     if (byteSize >= 0) {
                         doEncryptDecrypt(cryptoAlg, byteSize, frameSize);
-                        doEncryptDecryptWithKeyring(cryptoAlg, byteSize, frameSize);
                     }
                 }
             }
@@ -222,13 +183,12 @@ public class AwsCryptoTest {
                 for (int j = 0; j < bytesToTest.length; j++) {
                     final int byteSize = bytesToTest[j];
 
-                    if (byteSize > 500_000 && isFastTestsOnly()) {
+                    if (byteSize > 500_000 && isFastTestSuiteActive()) {
                         continue;
                     }
 
                     if (byteSize >= 0) {
                         doTamperedEncryptDecrypt(cryptoAlg, byteSize, frameSize);
-                        doTamperedEncryptDecryptWithKeyring(cryptoAlg, byteSize, frameSize);
                     }
                 }
             }
@@ -248,7 +208,7 @@ public class AwsCryptoTest {
                 for (int j = 0; j < bytesToTest.length; j++) {
                     final int byteSize = bytesToTest[j];
 
-                    if (byteSize > 500_000 && isFastTestsOnly()) {
+                    if (byteSize > 500_000 && isFastTestSuiteActive()) {
                         continue;
                     }
 
@@ -291,42 +251,6 @@ public class AwsCryptoTest {
         // TODO decrypt
         assertFalse(didDecrypt[0]);
         CryptoResult<byte[], ?> plaintextResult = encryptionClient_.decryptData(manager, ciphertext.getResult());
-        assertArrayEquals(plaintext, plaintextResult.getResult());
-        assertTrue(didDecrypt[0]);
-    }
-
-    @Test
-    public void encryptDecryptWithCustomManagerWithKeyring() {
-        boolean[] didDecrypt = new boolean[] { false };
-
-        CryptoMaterialsManager manager = new CryptoMaterialsManager() {
-            @Override public EncryptionMaterials getMaterialsForEncrypt(
-                    EncryptionMaterialsRequest request
-            ) {
-                request = request.toBuilder().setContext(singletonMap("foo", "bar")).build();
-
-                return new DefaultCryptoMaterialsManager(keyring).getMaterialsForEncrypt(request);
-            }
-
-            @Override public DecryptionMaterials decryptMaterials(
-                    DecryptionMaterialsRequest request
-            ) {
-                didDecrypt[0] = true;
-                return new DefaultCryptoMaterialsManager(keyring).decryptMaterials(request);
-            }
-        };
-
-        byte[] plaintext = new byte[100];
-
-        AwsCryptoResult<byte[]> ciphertext = encryptionClient_.encrypt(EncryptRequest.builder()
-                .cryptoMaterialsManager(manager)
-                .plaintext(plaintext).build());
-        assertEquals("bar", ciphertext.getEncryptionContext().get("foo"));
-
-        assertFalse(didDecrypt[0]);
-        AwsCryptoResult<byte[]>  plaintextResult = encryptionClient_.decrypt(DecryptRequest.builder()
-                .cryptoMaterialsManager(manager)
-                .ciphertext(ciphertext.getResult()).build());
         assertArrayEquals(plaintext, plaintextResult.getResult());
         assertTrue(didDecrypt[0]);
     }
@@ -380,21 +304,6 @@ public class AwsCryptoTest {
         verify(masterKeyProvider, times(1)).decryptDataKey(any(), any(), any());
     }
 
-    @Test
-    public void whenDecrypting_invokesOnDecryptOnce() throws Exception {
-        byte[] data = encryptionClient_.encrypt(EncryptRequest.builder()
-                .keyring(keyring)
-                .plaintext(new byte[1]).build()).getResult();
-
-        reset(keyring);
-
-        encryptionClient_.decrypt(DecryptRequest.builder()
-                .keyring(keyring)
-                .ciphertext(data).build());
-
-        verify(keyring, times(1)).onDecrypt(any(), any());
-    }
-
     private void doEstimateCiphertextSize(final CryptoAlgorithm cryptoAlg, final int inLen, final int frameSize) {
         final byte[] plaintext = TestIOUtils.generateRandomPlaintext(inLen);
 
@@ -418,32 +327,6 @@ public class AwsCryptoTest {
         assertTrue(errMsg, estimatedCiphertextSize - cipherText.length <= 16);
     }
 
-    private void doEstimateCiphertextSizeWithKeyring(final CryptoAlgorithm cryptoAlg, final int inLen, final int frameSize) {
-        final byte[] plaintext = TestIOUtils.generateRandomPlaintext(inLen);
-
-        final Map<String, String> encryptionContext = new HashMap<>(1);
-        encryptionContext.put("ENC1", "Ciphertext size estimation test with " + inLen);
-
-        encryptionClient_.setEncryptionAlgorithm(cryptoAlg);
-        encryptionClient_.setEncryptionFrameSize(frameSize);
-
-        final long estimatedCiphertextSize = encryptionClient_.estimateCiphertextSize(EstimateCiphertextSizeRequest.builder()
-                        .keyring(keyring)
-                        .encryptionContext(encryptionContext)
-                        .plaintextSize(inLen)
-                        .build());
-        final byte[] cipherText = encryptionClient_.encrypt(EncryptRequest.builder()
-                .keyring(keyring)
-                .encryptionContext(encryptionContext)
-                .plaintext(plaintext).build()).getResult();
-
-        // The estimate should be close (within 16 bytes) and never less than reality
-        final String errMsg = "Bad estimation for " + cryptoAlg + " expected: <" + estimatedCiphertextSize
-                + "> but was: <" + cipherText.length + ">";
-        assertTrue(errMsg, estimatedCiphertextSize - cipherText.length >= 0);
-        assertTrue(errMsg, estimatedCiphertextSize - cipherText.length <= 16);
-    }
-
     @Test
     public void estimateCiphertextSize() {
         for (final CryptoAlgorithm cryptoAlg : EnumSet.allOf(CryptoAlgorithm.class)) {
@@ -457,13 +340,12 @@ public class AwsCryptoTest {
                 for (int j = 0; j < bytesToTest.length; j++) {
                     final int byteSize = bytesToTest[j];
 
-                    if (byteSize > 500_000 && isFastTestsOnly()) {
+                    if (byteSize > 500_000 && isFastTestSuiteActive()) {
                         continue;
                     }
 
                     if (byteSize >= 0) {
                         doEstimateCiphertextSize(cryptoAlg, byteSize, frameSize);
-                        doEstimateCiphertextSizeWithKeyring(cryptoAlg, byteSize, frameSize);
                     }
                 }
             }
@@ -613,7 +495,7 @@ public class AwsCryptoTest {
     // Test that all the parameters that aren't allowed to be null (i.e. all of them) result in immediate NPEs if
     // invoked with null args
     @Test
-    public void assertNullValidation() throws Exception {
+    public void assertNullChecks() throws Exception {
         byte[] buf = new byte[1];
         HashMap<String, String> context = new HashMap<>();
         MasterKeyProvider provider = masterKeyProvider;
@@ -624,176 +506,143 @@ public class AwsCryptoTest {
         byte[] ciphertext = encryptionClient_.encryptData(cmm, buf).getResult();
         String stringCiphertext = encryptionClient_.encryptString(cmm, "hello, world").getResult();
 
-        assertNullChecks(encryptionClient_, "estimateCiphertextSize",
+        TestUtils.assertNullChecks(encryptionClient_, "estimateCiphertextSize",
                                    MasterKeyProvider.class, provider,
                                    Integer.TYPE, 42,
                                    Map.class, context
         );
-        assertNullChecks(encryptionClient_, "estimateCiphertextSize",
+        TestUtils.assertNullChecks(encryptionClient_, "estimateCiphertextSize",
                                    CryptoMaterialsManager.class, cmm,
                                    Integer.TYPE, 42,
                                    Map.class, context
         );
-        assertNullChecks(encryptionClient_, "estimateCiphertextSize",
+        TestUtils.assertNullChecks(encryptionClient_, "estimateCiphertextSize",
                                    MasterKeyProvider.class, provider,
                                    Integer.TYPE, 42
         );
-        assertNullChecks(encryptionClient_, "estimateCiphertextSize",
+        TestUtils.assertNullChecks(encryptionClient_, "estimateCiphertextSize",
                                    CryptoMaterialsManager.class, cmm,
                                    Integer.TYPE, 42
         );
-        assertNullChecks(encryptionClient_, "estimateCiphertextSize",
-                EstimateCiphertextSizeRequest.class, EstimateCiphertextSizeRequest.builder()
-                .cryptoMaterialsManager(cmm)
-                .plaintextSize(42).build()
-        );
-        assertNullChecks(encryptionClient_, "encryptData",
+
+        TestUtils.assertNullChecks(encryptionClient_, "encryptData",
                                    MasterKeyProvider.class, provider,
                                    byte[].class, buf,
                                    Map.class, context
         );
-        assertNullChecks(encryptionClient_, "encryptData",
+        TestUtils.assertNullChecks(encryptionClient_, "encryptData",
                                    CryptoMaterialsManager.class, cmm,
                                    byte[].class, buf,
                                    Map.class, context
         );
-        assertNullChecks(encryptionClient_, "encryptData",
+        TestUtils.assertNullChecks(encryptionClient_, "encryptData",
                                    MasterKeyProvider.class, provider,
                                    byte[].class, buf
         );
-        assertNullChecks(encryptionClient_, "encryptData",
+        TestUtils.assertNullChecks(encryptionClient_, "encryptData",
                                    CryptoMaterialsManager.class, cmm,
                                    byte[].class, buf
         );
-        assertNullChecks(encryptionClient_, "encrypt",
-                EncryptRequest.class, EncryptRequest.builder()
-                .cryptoMaterialsManager(cmm)
-                .plaintext(buf).build()
-        );
-        assertNullChecks(encryptionClient_, "encryptString",
+        TestUtils.assertNullChecks(encryptionClient_, "encryptString",
                                    MasterKeyProvider.class, provider,
                                    String.class, "",
                                    Map.class, context
         );
-        assertNullChecks(encryptionClient_, "encryptString",
+        TestUtils.assertNullChecks(encryptionClient_, "encryptString",
                                    CryptoMaterialsManager.class, cmm,
                                    String.class, "",
                                    Map.class, context
         );
-        assertNullChecks(encryptionClient_, "encryptString",
+        TestUtils.assertNullChecks(encryptionClient_, "encryptString",
                                    MasterKeyProvider.class, provider,
                                    String.class, ""
         );
-        assertNullChecks(encryptionClient_, "encryptString",
+        TestUtils.assertNullChecks(encryptionClient_, "encryptString",
                                    CryptoMaterialsManager.class, cmm,
                                    String.class, ""
         );
 
-        assertNullChecks(encryptionClient_, "decryptData",
+        TestUtils.assertNullChecks(encryptionClient_, "decryptData",
                                    MasterKeyProvider.class, provider,
                                    byte[].class, ciphertext
         );
-        assertNullChecks(encryptionClient_, "decryptData",
+        TestUtils.assertNullChecks(encryptionClient_, "decryptData",
                                    CryptoMaterialsManager.class, cmm,
                                    byte[].class, ciphertext
         );
-        assertNullChecks(encryptionClient_, "decryptData",
+        TestUtils.assertNullChecks(encryptionClient_, "decryptData",
                                    MasterKeyProvider.class, provider,
                                    ParsedCiphertext.class, new ParsedCiphertext(ciphertext)
         );
-        assertNullChecks(encryptionClient_, "decryptData",
+        TestUtils.assertNullChecks(encryptionClient_, "decryptData",
                                    CryptoMaterialsManager.class, cmm,
                                    ParsedCiphertext.class, new ParsedCiphertext(ciphertext)
         );
-        assertNullChecks(encryptionClient_, "decrypt",
-                DecryptRequest.class, DecryptRequest.builder()
-                .cryptoMaterialsManager(cmm)
-                .ciphertext(ciphertext).build()
-        );
-        assertNullChecks(encryptionClient_, "decryptString",
+        TestUtils.assertNullChecks(encryptionClient_, "decryptString",
                                    MasterKeyProvider.class, provider,
                                    String.class, stringCiphertext
         );
-        assertNullChecks(encryptionClient_, "decryptString",
+        TestUtils.assertNullChecks(encryptionClient_, "decryptString",
                                    CryptoMaterialsManager.class, cmm,
                                    String.class, stringCiphertext
         );
 
-        assertNullChecks(encryptionClient_, "createEncryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createEncryptingStream",
                                    MasterKeyProvider.class, provider,
                                    OutputStream.class, os,
                                    Map.class, context
                                    );
-        assertNullChecks(encryptionClient_, "createEncryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createEncryptingStream",
                                    CryptoMaterialsManager.class, cmm,
                                    OutputStream.class, os,
                                    Map.class, context
         );
 
-        assertNullChecks(encryptionClient_, "createEncryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createEncryptingStream",
                                    MasterKeyProvider.class, provider,
                                    OutputStream.class, os
         );
-        assertNullChecks(encryptionClient_, "createEncryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createEncryptingStream",
                                    CryptoMaterialsManager.class, cmm,
                                    OutputStream.class, os
         );
-        assertNullChecks(encryptionClient_, "createEncryptingOutputStream",
-                CreateEncryptingOutputStreamRequest.class, CreateEncryptingOutputStreamRequest.builder()
-                .cryptoMaterialsManager(cmm)
-                .outputStream(os).build()
-        );
-        assertNullChecks(encryptionClient_, "createEncryptingStream",
+
+        TestUtils.assertNullChecks(encryptionClient_, "createEncryptingStream",
                                    MasterKeyProvider.class, provider,
                                    InputStream.class, is,
                                    Map.class, context
         );
-        assertNullChecks(encryptionClient_, "createEncryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createEncryptingStream",
                                    CryptoMaterialsManager.class, cmm,
                                    InputStream.class, is,
                                    Map.class, context
         );
 
-        assertNullChecks(encryptionClient_, "createEncryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createEncryptingStream",
                                    MasterKeyProvider.class, provider,
                                    InputStream.class, is
         );
-        assertNullChecks(encryptionClient_, "createEncryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createEncryptingStream",
                                    CryptoMaterialsManager.class, cmm,
                                    InputStream.class, is
         );
-        assertNullChecks(encryptionClient_, "createEncryptingInputStream",
-                CreateEncryptingInputStreamRequest.class, CreateEncryptingInputStreamRequest.builder()
-                        .cryptoMaterialsManager(cmm)
-                        .inputStream(is).build()
-        );
 
-        assertNullChecks(encryptionClient_, "createDecryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createDecryptingStream",
                                    MasterKeyProvider.class, provider,
                                    OutputStream.class, os
         );
-        assertNullChecks(encryptionClient_, "createDecryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createDecryptingStream",
                                    CryptoMaterialsManager.class, cmm,
                                    OutputStream.class, os
         );
 
-        assertNullChecks(encryptionClient_, "createDecryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createDecryptingStream",
                                    MasterKeyProvider.class, provider,
                                    InputStream.class, is
         );
-        assertNullChecks(encryptionClient_, "createDecryptingStream",
+        TestUtils.assertNullChecks(encryptionClient_, "createDecryptingStream",
                                    CryptoMaterialsManager.class, cmm,
                                    InputStream.class, is
-        );
-        assertNullChecks(encryptionClient_, "createDecryptingInputStream",
-                CreateDecryptingInputStreamRequest.class, CreateDecryptingInputStreamRequest.builder()
-                .cryptoMaterialsManager(cmm)
-                .inputStream(is).build()
-        );
-        assertNullChecks(encryptionClient_, "createDecryptingOutputStream",
-                CreateDecryptingOutputStreamRequest.class, CreateDecryptingOutputStreamRequest.builder()
-                        .cryptoMaterialsManager(cmm)
-                        .outputStream(os).build()
         );
     }
 

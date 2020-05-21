@@ -15,7 +15,6 @@ package com.amazonaws.encryptionsdk;
 
 import static com.amazonaws.encryptionsdk.TestUtils.assertThrows;
 import static com.amazonaws.encryptionsdk.TestUtils.insecureRandomBytes;
-import static com.amazonaws.encryptionsdk.TestUtils.isFastTestsOnly;
 import static com.amazonaws.encryptionsdk.internal.TestIOUtils.getSha256Hash;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -164,7 +163,7 @@ public class CryptoInputStreamTest {
                 // Our bytesToTest and readLenVals arrays tend to have the bigger numbers towards the end - we'll chop off
                 // the last few as they take the longest and don't really add that much more coverage.
                 int skipLastNSizes;
-                if (!isFastTestsOnly()) {
+                if (!FastTestsOnlySuite.isFastTestSuiteActive()) {
                     skipLastNSizes = 0;
                 } else if (firstAlgorithm) {
                     // We'll run more tests for the first algorithm in the list - but not go quite so far as running the

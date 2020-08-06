@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
@@ -150,6 +151,26 @@ public class AwsCryptoTest {
                 .ciphertext(cipherText).build()));
     }
 
+    private void doTruncatedEncryptDecrypt(final CryptoAlgorithm cryptoAlg, final int byteSize, final int frameSize) {
+        final byte[] plaintextBytes = new byte[byteSize];
+
+        final Map<String, String> encryptionContext = new HashMap<>(1);
+        encryptionContext.put("ENC1", "Encrypt-decrypt test with %d" + byteSize);
+
+        encryptionClient_.setEncryptionAlgorithm(cryptoAlg);
+        encryptionClient_.setEncryptionFrameSize(frameSize);
+
+        final byte[] cipherText = encryptionClient_.encryptData(
+                masterKeyProvider,
+                plaintextBytes,
+                encryptionContext).getResult();
+        final byte[] truncatedCipherText = Arrays.copyOf(cipherText, cipherText.length - 1);
+
+        assertThrows(BadCiphertextException.class, () -> encryptionClient_.decryptData(
+                masterKeyProvider,
+                truncatedCipherText));
+    }
+
     private void doEncryptDecryptWithParsedCiphertext(final int byteSize, final int frameSize) {
         final byte[] plaintextBytes = new byte[byteSize];
 
@@ -229,6 +250,31 @@ public class AwsCryptoTest {
                     if (byteSize >= 0) {
                         doTamperedEncryptDecrypt(cryptoAlg, byteSize, frameSize);
                         doTamperedEncryptDecryptWithKeyring(cryptoAlg, byteSize, frameSize);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void encryptDecryptWithTruncatedCiphertext() {
+        for (final CryptoAlgorithm cryptoAlg : EnumSet.allOf(CryptoAlgorithm.class)) {
+            final int[] frameSizeToTest = TestUtils.getFrameSizesToTest(cryptoAlg);
+
+            for (int i = 0; i < frameSizeToTest.length; i++) {
+                final int frameSize = frameSizeToTest[i];
+                int[] bytesToTest = { 0, 1, frameSize - 1, frameSize, frameSize + 1, (int) (frameSize * 1.5),
+                        frameSize * 2, 1000000 };
+
+                for (int j = 0; j < bytesToTest.length; j++) {
+                    final int byteSize = bytesToTest[j];
+
+                    if (byteSize > 500_000) {
+                        continue;
+                    }
+
+                    if (byteSize >= 0) {
+                        doTruncatedEncryptDecrypt(cryptoAlg, byteSize, frameSize);
                     }
                 }
             }

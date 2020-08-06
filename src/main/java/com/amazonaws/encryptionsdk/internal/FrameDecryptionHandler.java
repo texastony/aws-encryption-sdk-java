@@ -78,16 +78,16 @@ class FrameDecryptionHandler implements CryptoHandler {
      * 
      * @param in
      *            the input byte array.
-     * @param off
+     * @param inOff
      *            the offset into the in array where the data to be decrypted starts.
-     * @param len
+     * @param inLen
      *            the number of bytes to be decrypted.
      * @param out
      *            the output buffer the decrypted plaintext bytes go into.
      * @param outOff
      *            the offset into the output byte array the decrypted data starts at.
      * @return the number of bytes written to out and processed
-     * @throws BadCiphertextException
+     * @throws InvalidCiphertextException
      *             if frame number is invalid/out-of-order or if the bytes do not decrypt correctly.
      * @throws AwsCryptoException
      *             if the content type found in the headers is not of frame type.
@@ -96,11 +96,6 @@ class FrameDecryptionHandler implements CryptoHandler {
     public ProcessingSummary processBytes(final byte[] in, final int off, final int len, final byte[] out,
             final int outOff)
             throws BadCiphertextException, AwsCryptoException {
-
-        if (complete_) {
-            throw new AwsCryptoException("Ciphertext has already been processed.");
-        }
-
         final long totalBytesToParse = unparsedBytes_.length + (long) len;
         if (totalBytesToParse > Integer.MAX_VALUE) {
             throw new AwsCryptoException(
@@ -205,10 +200,6 @@ class FrameDecryptionHandler implements CryptoHandler {
      */
     @Override
     public int doFinal(final byte[] out, final int outOff) {
-        if (!complete_) {
-            throw new BadCiphertextException("Unable to process entire ciphertext.");
-        }
-
         return 0;
     }
 

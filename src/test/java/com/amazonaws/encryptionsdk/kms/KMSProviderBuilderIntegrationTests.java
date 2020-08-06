@@ -1,10 +1,10 @@
 package com.amazonaws.encryptionsdk.kms;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
@@ -19,9 +19,7 @@ import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.amazonaws.encryptionsdk.TestUtils;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
 import com.amazonaws.AbortedException;
@@ -43,10 +41,9 @@ import com.amazonaws.http.exception.HttpRequestTimeoutException;
 import com.amazonaws.services.kms.AWSKMS;
 import com.amazonaws.services.kms.AWSKMSClientBuilder;
 
-@Tag(TestUtils.TAG_INTEGRATION)
-class KMSProviderBuilderIntegrationTests {
+public class KMSProviderBuilderIntegrationTests {
     @Test
-    void whenBogusRegionsDecrypted_doesNotLeakClients() {
+    public void whenBogusRegionsDecrypted_doesNotLeakClients() throws Exception {
         AtomicReference<ConcurrentHashMap<String, AWSKMS>> kmsCache = new AtomicReference<>();
 
         KmsMasterKeyProvider mkp = (new KmsMasterKeyProvider.Builder() {
@@ -78,7 +75,7 @@ class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    void whenOperationSuccessful_clientIsCached() {
+    public void whenOperationSuccessful_clientIsCached() {
         AtomicReference<ConcurrentHashMap<String, AWSKMS>> kmsCache = new AtomicReference<>();
 
         KmsMasterKeyProvider mkp = (new KmsMasterKeyProvider.Builder() {
@@ -102,7 +99,7 @@ class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    void whenConstructedWithoutArguments_canUseMultipleRegions() {
+    public void whenConstructedWithoutArguments_canUseMultipleRegions() throws Exception {
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder().build();
 
         for (String key : KMSTestFixtures.TEST_KEY_IDS) {
@@ -118,27 +115,25 @@ class KMSProviderBuilderIntegrationTests {
         }
     }
 
-    @SuppressWarnings("deprecation") @Test
-    void whenLegacyConstructorsUsed_multiRegionDecryptIsNotSupported() {
+    @SuppressWarnings("deprecation") @Test(expected = CannotUnwrapDataKeyException.class)
+    public void whenLegacyConstructorsUsed_multiRegionDecryptIsNotSupported() throws Exception {
         KmsMasterKeyProvider mkp = new KmsMasterKeyProvider();
 
-        assertThrows(CannotUnwrapDataKeyException.class, () -> {
-            for (String key : KMSTestFixtures.TEST_KEY_IDS) {
-                byte[] ciphertext =
-                        new AwsCrypto().encryptData(
-                                KmsMasterKeyProvider.builder()
-                                        .withKeysForEncryption(key)
-                                        .build(),
-                                new byte[1]
-                        ).getResult();
+        for (String key : KMSTestFixtures.TEST_KEY_IDS) {
+            byte[] ciphertext =
+                    new AwsCrypto().encryptData(
+                            KmsMasterKeyProvider.builder()
+                                                .withKeysForEncryption(key)
+                                                .build(),
+                            new byte[1]
+                    ).getResult();
 
-                new AwsCrypto().decryptData(mkp, ciphertext);
-            }
-        });
+            new AwsCrypto().decryptData(mkp, ciphertext);
+        }
     }
 
     @Test
-    void whenHandlerConfigured_handlerIsInvoked() {
+    public void whenHandlerConfigured_handlerIsInvoked() throws Exception {
         RequestHandler2 handler = spy(new RequestHandler2() {});
         KmsMasterKeyProvider mkp =
                 KmsMasterKeyProvider.builder()
@@ -155,7 +150,7 @@ class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    void whenShortTimeoutSet_timesOut() {
+    public void whenShortTimeoutSet_timesOut() throws Exception {
         // By setting a timeout of 1ms, it's not physically possible to complete both the us-west-2 and eu-central-1
         // requests due to speed of light limits.
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
@@ -184,7 +179,7 @@ class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    void whenCustomCredentialsSet_theyAreUsed() {
+    public void whenCustomCredentialsSet_theyAreUsed() throws Exception {
         AWSCredentialsProvider customProvider = spy(new DefaultAWSCredentialsProviderChain());
 
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
@@ -209,7 +204,7 @@ class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    void whenBuilderCloned_credentialsAndConfigurationAreRetained() {
+    public void whenBuilderCloned_credentialsAndConfigurationAreRetained() throws Exception {
         AWSCredentialsProvider customProvider1 = spy(new DefaultAWSCredentialsProviderChain());
         AWSCredentialsProvider customProvider2 = spy(new DefaultAWSCredentialsProviderChain());
 
@@ -242,7 +237,7 @@ class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    void whenBuilderCloned_clientBuilderCustomizationIsRetained() {
+    public void whenBuilderCloned_clientBuilderCustomizationIsRetained() throws Exception {
         RequestHandler2 handler = spy(new RequestHandler2() {});
 
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
@@ -257,9 +252,9 @@ class KMSProviderBuilderIntegrationTests {
         verify(handler, atLeastOnce()).beforeRequest(any());
     }
 
-    @Test
-    void whenBogusEndpointIsSet_constructionFails() {
-        assertThrows(IllegalArgumentException.class, () -> KmsMasterKeyProvider.builder()
+    @Test(expected = IllegalArgumentException.class)
+    public void whenBogusEndpointIsSet_constructionFails() throws Exception {
+        KmsMasterKeyProvider.builder()
                             .withClientBuilder(
                                     AWSKMSClientBuilder.standard()
                                                        .withEndpointConfiguration(
@@ -267,11 +262,11 @@ class KMSProviderBuilderIntegrationTests {
                                                                        "https://this.does.not.exist.example.com",
                                                                        "bad-region")
                                                        )
-                            ));
+                            );
     }
 
     @Test
-    void whenUserAgentsOverridden_originalUAsPreserved() {
+    public void whenUserAgentsOverridden_originalUAsPreserved() throws Exception {
         RequestHandler2 handler = spy(new RequestHandler2() {});
 
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
@@ -299,7 +294,7 @@ class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    void whenDefaultRegionSet_itIsUsedForBareKeyIds() {
+    public void whenDefaultRegionSet_itIsUsedForBareKeyIds() throws Exception {
         // TODO: Need to set up a role to assume as bare key IDs are relative to the caller account
     }
 }

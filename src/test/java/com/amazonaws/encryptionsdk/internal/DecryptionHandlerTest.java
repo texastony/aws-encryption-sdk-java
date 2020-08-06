@@ -16,7 +16,7 @@ package com.amazonaws.encryptionsdk.internal;
 import java.util.Collections;
 import java.util.Map;
 
-import com.amazonaws.encryptionsdk.keyrings.Keyring;
+import com.amazonaws.encryptionsdk.model.CiphertextHeaders;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -30,16 +30,12 @@ import com.amazonaws.encryptionsdk.model.CiphertextType;
 import com.amazonaws.encryptionsdk.model.EncryptionMaterialsRequest;
 import com.amazonaws.encryptionsdk.model.EncryptionMaterials;
 
-import static org.junit.Assert.assertEquals;
-
 public class DecryptionHandlerTest {
     private StaticMasterKey masterKeyProvider_;
-    private Keyring keyring;
 
     @Before
     public void init() {
         masterKeyProvider_ = new StaticMasterKey("testmaterial");
-        keyring = new TestKeyring("testmaterial");
     }
 
     @Test(expected = NullPointerException.class)
@@ -146,12 +142,17 @@ public class DecryptionHandlerTest {
         decryptionHandler.processBytes(in, -1, in.length, out, 0);
     }
 
-    @Test
-    public void testNullMasterKey() {
-        final DecryptionHandler decryptionHandler = DecryptionHandler.create(new DefaultCryptoMaterialsManager(keyring));
+    @Test(expected = BadCiphertextException.class)
+    public void incompleteCiphertext() {
+        byte[] ciphertext = getTestHeaders();
+
+        CiphertextHeaders h = new CiphertextHeaders();
+        h.deserialize(ciphertext, 0);
+
+        final DecryptionHandler<StaticMasterKey> decryptionHandler = DecryptionHandler.create(masterKeyProvider_);
         final byte[] out = new byte[1];
-        final byte[] testHeaders = getTestHeaders();
-        decryptionHandler.processBytes(getTestHeaders(), 0, testHeaders.length, out, 0);
-        assertEquals(0, decryptionHandler.getMasterKeys().size());
+
+        decryptionHandler.processBytes(ciphertext, 0, ciphertext.length - 1, out, 0);
+        decryptionHandler.doFinal(out, 0);
     }
 }

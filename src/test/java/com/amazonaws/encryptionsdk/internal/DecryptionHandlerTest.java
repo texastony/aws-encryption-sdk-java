@@ -27,23 +27,17 @@ import com.amazonaws.encryptionsdk.model.CiphertextType;
 import com.amazonaws.encryptionsdk.model.EncryptionMaterialsRequest;
 import com.amazonaws.encryptionsdk.model.EncryptionMaterials;
 
-<<<<<<< HEAD
-=======
 import static com.amazonaws.encryptionsdk.TestUtils.assertThrows;
 import static org.junit.Assert.assertArrayEquals;
->>>>>>> master
 import static org.junit.Assert.assertEquals;
 
 public class DecryptionHandlerTest {
     private StaticMasterKey masterKeyProvider_;
-<<<<<<< HEAD
     private Keyring keyring;
-=======
     private final CommitmentPolicy commitmentPolicy = TestUtils.DEFAULT_TEST_COMMITMENT_POLICY;
     private final CommitmentPolicy requireReadPolicy = CommitmentPolicy.RequireEncryptRequireDecrypt;
     private final List<CommitmentPolicy> allowReadPolicies = Arrays.asList(CommitmentPolicy.RequireEncryptAllowDecrypt,
             CommitmentPolicy.ForbidEncryptAllowDecrypt);
->>>>>>> master
 
     @Before
     public void init() {
@@ -231,14 +225,6 @@ public class DecryptionHandlerTest {
     }
 
     @Test
-<<<<<<< HEAD
-    public void testNullMasterKey() {
-        final DecryptionHandler decryptionHandler = DecryptionHandler.create(new DefaultCryptoMaterialsManager(keyring));
-        final byte[] out = new byte[1];
-        final byte[] testHeaders = getTestHeaders();
-        decryptionHandler.processBytes(getTestHeaders(), 0, testHeaders.length, out, 0);
-        assertEquals(0, decryptionHandler.getMasterKeys().size());
-=======
     public void incompleteCiphertextV2() {
         byte[] ciphertext = Utils.decodeBase64String(TestUtils.messageWithCommitKeyBase64);
         final DecryptionHandler<JceMasterKey> decryptionHandler = DecryptionHandler.create(
@@ -285,6 +271,16 @@ public class DecryptionHandlerTest {
         final byte[] plaintext = new byte[plaintextLen];
         assertThrows(BadCiphertextException.class, "Tag mismatch", () ->
                 decryptionHandler.processBytes(ciphertext, 0, ciphertext.length, plaintext, 0));
->>>>>>> master
+    }
+
+    @Test
+    public void testNullMasterKey() {
+        final DecryptionHandler decryptionHandler = DecryptionHandler.create(
+            new DefaultCryptoMaterialsManager(keyring),
+            CommitmentPolicy.RequireEncryptRequireDecrypt);
+        final byte[] out = new byte[1];
+        final byte[] testHeaders = getTestHeaders();
+        decryptionHandler.processBytes(getTestHeaders(), 0, testHeaders.length, out, 0);
+        assertEquals(0, decryptionHandler.getMasterKeys().size());
     }
 }

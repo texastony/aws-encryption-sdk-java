@@ -1,13 +1,7 @@
-<<<<<<< HEAD:src/examples/java/com/amazonaws/crypto/examples/legacy/FileStreamingExample.java
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: Apache-2.0
-package com.amazonaws.crypto.examples.legacy;
-=======
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.amazonaws.crypto.examples;
->>>>>>> master:src/examples/java/com/amazonaws/crypto/examples/FileStreamingExample.java
+package com.amazonaws.crypto.examples.legacy;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -57,10 +51,6 @@ public class FileStreamingExample {
         // Create a JCE master key provider using the random key and an AES-GCM encryption algorithm.
         JceMasterKey masterKey = JceMasterKey.getInstance(cryptoKey, "Example", "RandomKey", "AES/GCM/NoPadding");
 
-<<<<<<< HEAD:src/examples/java/com/amazonaws/crypto/examples/legacy/FileStreamingExample.java
-        // Instantiate the AWS Encryption SDK.
-        AwsCrypto crypto = new AwsCrypto();
-=======
         // Instantiate the SDK.
         // This builds the AwsCrypto client with the RequireEncryptRequireDecrypt commitment policy,
         // which enforces that this client only encrypts using committing algorithm suites and enforces
@@ -70,7 +60,6 @@ public class FileStreamingExample {
         final AwsCrypto crypto = AwsCrypto.builder()
                 .withCommitmentPolicy(CommitmentPolicy.RequireEncryptRequireDecrypt)
                 .build();
->>>>>>> master:src/examples/java/com/amazonaws/crypto/examples/FileStreamingExample.java
 
         // Create an encryption context to identify this ciphertext.
         Map<String, String> context = Collections.singletonMap("Example", "FileStreaming");

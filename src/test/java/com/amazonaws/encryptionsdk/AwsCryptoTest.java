@@ -11,7 +11,6 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
@@ -31,12 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-<<<<<<< HEAD
 import com.amazonaws.encryptionsdk.internal.TestKeyring;
 import com.amazonaws.encryptionsdk.keyrings.Keyring;
-=======
 import com.amazonaws.encryptionsdk.jce.JceMasterKey;
->>>>>>> master
 import org.junit.Before;
 import org.junit.Test;
 
@@ -55,11 +51,8 @@ import com.amazonaws.encryptionsdk.model.EncryptionMaterialsRequest;
 
 public class AwsCryptoTest {
     private StaticMasterKey masterKeyProvider;
-<<<<<<< HEAD
     private Keyring keyring;
-=======
     private AwsCrypto forbidCommitmentClient_;
->>>>>>> master
     private AwsCrypto encryptionClient_;
     private static final CommitmentPolicy commitmentPolicy = TestUtils.DEFAULT_TEST_COMMITMENT_POLICY;
 
@@ -105,14 +98,15 @@ public class AwsCryptoTest {
         final Map<String, String> encryptionContext = new HashMap<>(1);
         encryptionContext.put("ENC1", "Encrypt-decrypt-keyring test with %d" + byteSize);
 
-        encryptionClient_.setEncryptionAlgorithm(cryptoAlg);
-        encryptionClient_.setEncryptionFrameSize(frameSize);
+        AwsCrypto client = cryptoAlg.isCommitting() ? encryptionClient_ : forbidCommitmentClient_;
+        client.setEncryptionAlgorithm(cryptoAlg);
+        client.setEncryptionFrameSize(frameSize);
 
-        final byte[] cipherText = encryptionClient_.encrypt(request -> request
+        final byte[] cipherText = client.encrypt(request -> request
                 .keyring(keyring)
                 .encryptionContext(encryptionContext)
                 .plaintext(plaintextBytes)).getResult();
-        final byte[] decryptedText = encryptionClient_.decrypt(request -> request
+        final byte[] decryptedText = client.decrypt(request -> request
                 .keyring(keyring)
                 .ciphertext(cipherText)).getResult();
 
@@ -134,11 +128,10 @@ public class AwsCryptoTest {
                 plaintextBytes,
                 encryptionContext).getResult();
         cipherText[cipherText.length - 2] ^= (byte) 0xff;
-<<<<<<< HEAD
 
-        assertThrows(BadCiphertextException.class, () -> encryptionClient_.decryptData(
-                masterKeyProvider,
-                cipherText));
+        assertThrows(BadCiphertextException.class, () -> client.decryptData(
+            masterKeyProvider,
+            cipherText));
     }
 
     private void doTamperedEncryptDecryptWithKeyring(final CryptoAlgorithm cryptoAlg, final int byteSize, final int frameSize) {
@@ -147,28 +140,22 @@ public class AwsCryptoTest {
         final Map<String, String> encryptionContext = new HashMap<>(1);
         encryptionContext.put("ENC1", "Encrypt-decrypt-keyring test with %d" + byteSize);
 
-        encryptionClient_.setEncryptionAlgorithm(cryptoAlg);
-        encryptionClient_.setEncryptionFrameSize(frameSize);
+        AwsCrypto client = cryptoAlg.isCommitting() ? encryptionClient_ : forbidCommitmentClient_;
+        client.setEncryptionAlgorithm(cryptoAlg);
+        client.setEncryptionFrameSize(frameSize);
 
-        final byte[] cipherText = encryptionClient_.encrypt(EncryptRequest.builder()
+        final byte[] cipherText = client.encrypt(EncryptRequest.builder()
                 .keyring(keyring)
                 .plaintext(plaintextBytes).build()).getResult();
         cipherText[cipherText.length - 2] ^= (byte) 0xff;
 
-        assertThrows(BadCiphertextException.class, () -> encryptionClient_.decrypt(DecryptRequest.builder()
+        assertThrows(BadCiphertextException.class, () -> client.decrypt(DecryptRequest.builder()
                 .keyring(keyring)
                 .ciphertext(cipherText).build()));
-=======
-        try {
-            client.decryptData(
-                    masterKeyProvider,
-                    cipherText
-                    ).getResult();
-            fail("Expected BadCiphertextException");
-        } catch (final BadCiphertextException ex) {
-            // Expected exception
-        }
->>>>>>> master
+
+        assertThrows(BadCiphertextException.class, () -> client.decryptData(
+            masterKeyProvider,
+            cipherText));
     }
 
     private void doTruncatedEncryptDecrypt(final CryptoAlgorithm cryptoAlg, final int byteSize, final int frameSize) {
@@ -186,22 +173,9 @@ public class AwsCryptoTest {
                 plaintextBytes,
                 encryptionContext).getResult();
         final byte[] truncatedCipherText = Arrays.copyOf(cipherText, cipherText.length - 1);
-<<<<<<< HEAD
-
-        assertThrows(BadCiphertextException.class, () -> encryptionClient_.decryptData(
-                masterKeyProvider,
-                truncatedCipherText));
-=======
-        try {
-            client.decryptData(
-                    masterKeyProvider,
-                    truncatedCipherText
-            ).getResult();
-            fail("Expected BadCiphertextException");
-        } catch (final BadCiphertextException ex) {
-            // Expected exception
-        }
->>>>>>> master
+        assertThrows(BadCiphertextException.class, () -> client.decryptData(
+            masterKeyProvider,
+            truncatedCipherText));
     }
 
     private void doEncryptDecryptWithParsedCiphertext(final CryptoAlgorithm cryptoAlg, final int byteSize, final int frameSize) {
@@ -558,15 +532,16 @@ public class AwsCryptoTest {
         final Map<String, String> encryptionContext = new HashMap<>(1);
         encryptionContext.put("ENC1", "Ciphertext size estimation test with " + inLen);
 
-        encryptionClient_.setEncryptionAlgorithm(cryptoAlg);
-        encryptionClient_.setEncryptionFrameSize(frameSize);
+        AwsCrypto client = cryptoAlg.isCommitting() ? encryptionClient_ : forbidCommitmentClient_;
+        client.setEncryptionAlgorithm(cryptoAlg);
+        client.setEncryptionFrameSize(frameSize);
 
-        final long estimatedCiphertextSize = encryptionClient_.estimateCiphertextSize(EstimateCiphertextSizeRequest.builder()
+        final long estimatedCiphertextSize = client.estimateCiphertextSize(EstimateCiphertextSizeRequest.builder()
                         .keyring(keyring)
                         .encryptionContext(encryptionContext)
                         .plaintextSize(inLen)
                         .build());
-        final byte[] cipherText = encryptionClient_.encrypt(EncryptRequest.builder()
+        final byte[] cipherText = client.encrypt(EncryptRequest.builder()
                 .keyring(keyring)
                 .encryptionContext(encryptionContext)
                 .plaintext(plaintext).build()).getResult();

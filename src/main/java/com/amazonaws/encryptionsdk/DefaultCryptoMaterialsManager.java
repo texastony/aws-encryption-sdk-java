@@ -3,7 +3,6 @@
 
 package com.amazonaws.encryptionsdk;
 
-import static com.amazonaws.encryptionsdk.AwsCrypto.getDefaultCryptoAlgorithm;
 import static java.util.Objects.requireNonNull;
 
 import java.security.GeneralSecurityException;
@@ -62,12 +61,8 @@ public class DefaultCryptoMaterialsManager implements CryptoMaterialsManager {
         this.mkp = null;
     }
 
-<<<<<<< HEAD
     @Override
     public EncryptionMaterials getMaterialsForEncrypt(EncryptionMaterialsRequest request) {
-        if(keyring != null) {
-            return getEncryptionMaterialsForKeyring(request);
-=======
         CryptoAlgorithm algo = request.getRequestedAlgorithm();
         CommitmentPolicy commitmentPolicy = request.getCommitmentPolicy();
         // Set default according to commitment policy
@@ -75,10 +70,11 @@ public class DefaultCryptoMaterialsManager implements CryptoMaterialsManager {
             algo = CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384;
         } else if (algo == null) {
             algo = CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384;
->>>>>>> master
         }
-
-        return getEncryptionMaterialsForMasterKeyProvider(request);
+        if (keyring != null) {
+            return getEncryptionMaterialsForKeyring(request, algo);
+        }
+        return getEncryptionMaterialsForMasterKeyProvider(request, algo);
     }
 
     @Override
@@ -90,9 +86,7 @@ public class DefaultCryptoMaterialsManager implements CryptoMaterialsManager {
         return getDecryptionMaterialsForMasterKeyProvider(request);
     }
 
-    private EncryptionMaterials getEncryptionMaterialsForKeyring(EncryptionMaterialsRequest request) {
-        final CryptoAlgorithm algorithmSuite = request.getRequestedAlgorithm() != null ?
-                request.getRequestedAlgorithm() : getDefaultCryptoAlgorithm();
+    private EncryptionMaterials getEncryptionMaterialsForKeyring(EncryptionMaterialsRequest request, CryptoAlgorithm algorithmSuite) {
         final Map<String, String> encryptionContext = new HashMap<>(request.getContext());
         final PrivateKey signingKey = getSigningKey(algorithmSuite, encryptionContext);
 
@@ -106,10 +100,8 @@ public class DefaultCryptoMaterialsManager implements CryptoMaterialsManager {
         return keyring.onEncrypt(encryptionMaterials);
     }
 
-    private EncryptionMaterials getEncryptionMaterialsForMasterKeyProvider(EncryptionMaterialsRequest request) {
+    private EncryptionMaterials getEncryptionMaterialsForMasterKeyProvider(EncryptionMaterialsRequest request, CryptoAlgorithm algorithmSuite) {
         final Map<String, String> encryptionContext = new HashMap<>(request.getContext());
-        final CryptoAlgorithm algorithmSuite = request.getRequestedAlgorithm() != null ?
-                request.getRequestedAlgorithm() : getDefaultCryptoAlgorithm();
         final PrivateKey trailingSignatureKey = getSigningKey(algorithmSuite, encryptionContext);
 
         final MasterKeyRequest.Builder mkRequestBuilder = MasterKeyRequest.newBuilder()

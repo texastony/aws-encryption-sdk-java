@@ -1,7 +1,7 @@
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.amazonaws.crypto.examples;
+package com.amazonaws.crypto.examples.legacy;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;

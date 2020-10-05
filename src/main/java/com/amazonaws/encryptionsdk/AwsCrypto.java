@@ -29,7 +29,7 @@ import static java.util.Objects.requireNonNull;
  * operations should start here. Most people will want to use either
  * {@link #encrypt(EncryptRequest)} and
  * {@link #decrypt(DecryptRequest)} to encrypt/decrypt things.
- * 
+ *
  * <P>
  * The core concepts (and classes) in this SDK are:
  * <ul>
@@ -267,31 +267,11 @@ public class AwsCrypto {
             final int plaintextSize,
             final Map<String, String> encryptionContext
     ) {
-<<<<<<< HEAD
         return estimateCiphertextSize(EstimateCiphertextSizeRequest.builder()
                 .cryptoMaterialsManager(materialsManager)
                 .encryptionContext(encryptionContext)
                 .plaintextSize(plaintextSize)
                 .build());
-=======
-        EncryptionMaterialsRequest request = EncryptionMaterialsRequest.newBuilder()
-                                                                       .setContext(encryptionContext)
-                                                                       .setRequestedAlgorithm(getEncryptionAlgorithm())
-        // We're not actually encrypting any data, so don't consume any bytes from the cache's limits. We do need to
-        // pass /something/ though, or the cache will be bypassed (as it'll assume this is a streaming encrypt of
-        // unknown size).
-                                                                       .setPlaintextSize(0)
-                                                                       .setCommitmentPolicy(commitmentPolicy_)
-                                                                       .build();
-
-        final MessageCryptoHandler cryptoHandler = new EncryptionHandler(
-                getEncryptionFrameSize(),
-                checkAlgorithm(materialsManager.getMaterialsForEncrypt(request)),
-                commitmentPolicy_
-        );
-
-        return cryptoHandler.estimateOutputSize(plaintextSize);
->>>>>>> master
     }
 
     /**
@@ -342,11 +322,13 @@ public class AwsCrypto {
                 // pass /something/ though, or the cache will be bypassed (as it'll assume this is a streaming encrypt of
                 // unknown size).
                 .setPlaintextSize(0)
+                .setCommitmentPolicy(commitmentPolicy_)
                 .build();
 
         final MessageCryptoHandler cryptoHandler = new EncryptionHandler(
                 getEncryptionFrameSize(),
-                checkAlgorithm(request.cryptoMaterialsManager().getMaterialsForEncrypt(encryptionMaterialsRequest))
+                checkAlgorithm(request.cryptoMaterialsManager().getMaterialsForEncrypt(encryptionMaterialsRequest)),
+                commitmentPolicy_
         );
 
         return cryptoHandler.estimateOutputSize(request.plaintextSize());
@@ -401,35 +383,10 @@ public class AwsCrypto {
             final byte[] plaintext,
             final Map<String, String> encryptionContext
     ) {
-<<<<<<< HEAD
         return encrypt(EncryptRequest.builder()
                 .cryptoMaterialsManager(materialsManager)
                 .plaintext(plaintext)
                 .encryptionContext(encryptionContext).build()).toCryptoResult();
-=======
-        EncryptionMaterialsRequest request = EncryptionMaterialsRequest.newBuilder()
-                                                                       .setContext(encryptionContext)
-                                                                       .setRequestedAlgorithm(getEncryptionAlgorithm())
-                                                                       .setPlaintext(plaintext)
-                                                                       .setCommitmentPolicy(commitmentPolicy_)
-                                                                       .build();
-
-        final MessageCryptoHandler cryptoHandler = new EncryptionHandler(
-                getEncryptionFrameSize(),
-                checkAlgorithm(materialsManager.getMaterialsForEncrypt(request)),
-                commitmentPolicy_
-        );
-
-        final int outSizeEstimate = cryptoHandler.estimateOutputSize(plaintext.length);
-        final byte[] out = new byte[outSizeEstimate];
-        int outLen = cryptoHandler.processBytes(plaintext, 0, plaintext.length, out, 0).getBytesWritten();
-        outLen += cryptoHandler.doFinal(out, outLen);
-
-        final byte[] outBytes = Utils.truncate(out, outLen);
-
-        //noinspection unchecked
-        return new CryptoResult(outBytes, cryptoHandler.getMasterKeys(), cryptoHandler.getHeaders());
->>>>>>> master
     }
 
     /**
@@ -473,13 +430,13 @@ public class AwsCrypto {
                 .setContext(request.encryptionContext())
                 .setRequestedAlgorithm(getEncryptionAlgorithm())
                 .setPlaintext(request.plaintext())
+                .setCommitmentPolicy(commitmentPolicy_)
                 .build();
 
         final EncryptionMaterials encryptionMaterials =
                 checkAlgorithm(request.cryptoMaterialsManager().getMaterialsForEncrypt(encryptionMaterialsRequest));
 
-        final MessageCryptoHandler cryptoHandler = new EncryptionHandler(
-                getEncryptionFrameSize(), encryptionMaterials);
+        final MessageCryptoHandler cryptoHandler = new EncryptionHandler(getEncryptionFrameSize(), encryptionMaterials, commitmentPolicy_);
 
         final int outSizeEstimate = cryptoHandler.estimateOutputSize(request.plaintext().length);
         final byte[] out = new byte[outSizeEstimate];
@@ -511,7 +468,7 @@ public class AwsCrypto {
      * {@code plaintext} and base64 encodes the result.
      * @deprecated Use the {@link #encrypt(EncryptRequest)} and
      * {@link #decrypt(DecryptRequest)} APIs instead. {@code encryptString} and {@code decryptString}
-     * work as expected if you use them together. However, to work with other language implementations of the AWS 
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
      * Encryption SDK, you need to base64-decode the output of {@code encryptString} and base64-encode the input to
      * {@code decryptString}. These deprecated APIs will be removed in the future.
      */
@@ -531,7 +488,7 @@ public class AwsCrypto {
      * {@code plaintext} and base64 encodes the result.
      * @deprecated Use the {@link #encryptData(CryptoMaterialsManager, byte[], Map)} and
      * {@link #decryptData(CryptoMaterialsManager, byte[])} APIs instead. {@code encryptString} and {@code decryptString}
-     * work as expected if you use them together. However, to work with other language implementations of the AWS 
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
      * Encryption SDK, you need to base64-decode the output of {@code encryptString} and base64-encode the input to
      * {@code decryptString}. These deprecated APIs will be removed in the future.
      */
@@ -555,7 +512,7 @@ public class AwsCrypto {
      * an empty {@code encryptionContext}.
      * @deprecated Use the {@link #encryptData(MasterKeyProvider, byte[])} and
      * {@link #decryptData(MasterKeyProvider, byte[])} APIs instead. {@code encryptString} and {@code decryptString}
-     * work as expected if you use them together. However, to work with other language implementations of the AWS 
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
      * Encryption SDK, you need to base64-decode the output of {@code encryptString} and base64-encode the input to
      * {@code decryptString}. These deprecated APIs will be removed in the future.
      */
@@ -570,7 +527,7 @@ public class AwsCrypto {
      * an empty {@code encryptionContext}.
      * @deprecated Use the {@link #encryptData(CryptoMaterialsManager, byte[])} and
      * {@link #decryptData(CryptoMaterialsManager, byte[])} APIs instead. {@code encryptString} and {@code decryptString}
-     * work as expected if you use them together. However, to work with other language implementations of the AWS 
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
      * Encryption SDK, you need to base64-decode the output of {@code encryptString} and base64-encode the input to
      * {@code decryptString}. These deprecated APIs will be removed in the future.
      */
@@ -645,7 +602,6 @@ public class AwsCrypto {
                         .parsedCiphertext(ciphertext).build()).toCryptoResult();
     }
 
-<<<<<<< HEAD
     /**
      * Decrypts the provided {@link ParsedCiphertext} using the {@link CryptoMaterialsManager} or the {@link Keyring}
      * specified in the {@link DecryptRequest}.
@@ -655,12 +611,8 @@ public class AwsCrypto {
      */
     public AwsCryptoResult<byte[]> decrypt(final DecryptRequest request) {
         requireNonNull(request, "request is required");
-=======
-        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(materialsManager, ciphertext, commitmentPolicy_);
->>>>>>> master
 
-        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(
-                request.cryptoMaterialsManager(), request.parsedCiphertext());
+        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(request.cryptoMaterialsManager(), request.parsedCiphertext(), commitmentPolicy_);
 
         final byte[] ciphertextBytes = request.parsedCiphertext().getCiphertext();
         final int contentLen = ciphertextBytes.length - request.parsedCiphertext().getOffset();
@@ -701,7 +653,7 @@ public class AwsCrypto {
      * @see #decryptData(MasterKeyProvider, byte[])
      * @deprecated Use the {@link #decryptData(MasterKeyProvider, byte[])} and
      * {@link #encryptData(MasterKeyProvider, byte[], Map)} APIs instead. {@code encryptString} and {@code decryptString}
-     * work as expected if you use them together. However, to work with other language implementations of the AWS 
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
      * Encryption SDK, you need to base64-decode the output of {@code encryptString} and base64-encode the input to
      * {@code decryptString}. These deprecated APIs will be removed in the future.
      */
@@ -721,7 +673,7 @@ public class AwsCrypto {
      * @see #decryptData(CryptoMaterialsManager, byte[])
      * @deprecated Use the {@link #decryptData(CryptoMaterialsManager, byte[])} and
      * {@link #encryptData(CryptoMaterialsManager, byte[], Map)} APIs instead. {@code encryptString}  and {@code decryptString}
-     * work as expected if you use them together. However, to work with other language implementations of the AWS 
+     * work as expected if you use them together. However, to work with other language implementations of the AWS
      * Encryption SDK, you need to base64-decode the output of {@code encryptString} and base64-encode the input to
      * {@code decryptString}. These deprecated APIs will be removed in the future.
      */
@@ -766,10 +718,10 @@ public class AwsCrypto {
     /**
      * Returns a {@link CryptoOutputStream} which encrypts the data prior to passing it onto the
      * underlying {@link OutputStream}.
-     * 
+     *
      * @see #encryptData(MasterKeyProvider, byte[], Map)
      * @see javax.crypto.CipherOutputStream
-     * 
+     *
      * @deprecated Replaced by {@link #createEncryptingOutputStream(CreateEncryptingOutputStreamRequest)}
      */
     @Deprecated
@@ -994,7 +946,6 @@ public class AwsCrypto {
     public CryptoOutputStream<?> createDecryptingStream(
             final CryptoMaterialsManager materialsManager, final OutputStream os
     ) {
-<<<<<<< HEAD
         return createDecryptingOutputStream(CreateDecryptingOutputStreamRequest.builder()
                 .cryptoMaterialsManager(materialsManager)
                 .outputStream(os).build()).toCryptoOutputStream();
@@ -1008,7 +959,7 @@ public class AwsCrypto {
      * @see javax.crypto.CipherOutputStream
      */
     public AwsCryptoOutputStream createDecryptingOutputStream(final CreateDecryptingOutputStreamRequest request) {
-        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(request.cryptoMaterialsManager());
+        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(request.cryptoMaterialsManager(), commitmentPolicy_);
         return new AwsCryptoOutputStream(request.outputStream(), cryptoHandler);
     }
 
@@ -1026,10 +977,6 @@ public class AwsCrypto {
      */
     public AwsCryptoOutputStream createDecryptingOutputStream(final Consumer<CreateDecryptingOutputStreamRequest.Builder> request) {
         return createDecryptingOutputStream(CreateDecryptingOutputStreamRequest.builder().applyMutation(request).build());
-=======
-        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(materialsManager, commitmentPolicy_);
-        return new CryptoOutputStream(os, cryptoHandler);
->>>>>>> master
     }
 
     /**
@@ -1045,7 +992,6 @@ public class AwsCrypto {
     public CryptoInputStream<?> createDecryptingStream(
             final CryptoMaterialsManager materialsManager, final InputStream is
     ) {
-<<<<<<< HEAD
         return createDecryptingInputStream(CreateDecryptingInputStreamRequest.builder()
                         .cryptoMaterialsManager(materialsManager)
                         .inputStream(is).build()).toCryptoInputStream();
@@ -1061,7 +1007,7 @@ public class AwsCrypto {
     public AwsCryptoInputStream createDecryptingInputStream(final CreateDecryptingInputStreamRequest request) {
         requireNonNull(request, "request is required");
 
-        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(request.cryptoMaterialsManager());
+        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(request.cryptoMaterialsManager(), commitmentPolicy_);
         return new AwsCryptoInputStream(request.inputStream(), cryptoHandler);
     }
 
@@ -1078,10 +1024,6 @@ public class AwsCrypto {
      */
     public AwsCryptoInputStream createDecryptingInputStream(final Consumer<CreateDecryptingInputStreamRequest.Builder> request) {
         return createDecryptingInputStream(CreateDecryptingInputStreamRequest.builder().applyMutation(request).build());
-=======
-        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(materialsManager, commitmentPolicy_);
-        return new CryptoInputStream(is, cryptoHandler);
->>>>>>> master
     }
 
     private MessageCryptoHandler getEncryptingStreamHandler(

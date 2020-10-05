@@ -1,20 +1,5 @@
-<<<<<<< HEAD
-/*
- * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except
- * in compliance with the License. A copy of the License is located at
- *
- * http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- */
-=======
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
->>>>>>> master
 
 package com.amazonaws.encryptionsdk.kms;
 
@@ -28,12 +13,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import com.amazonaws.AmazonServiceException;
-import com.amazonaws.ClientConfiguration;
 import com.amazonaws.Request;
 import com.amazonaws.Response;
 import com.amazonaws.auth.AWSCredentials;
@@ -48,15 +31,9 @@ import com.amazonaws.encryptionsdk.MasterKeyRequest;
 import com.amazonaws.encryptionsdk.exception.AwsCryptoException;
 import com.amazonaws.encryptionsdk.exception.NoSuchMasterKeyException;
 import com.amazonaws.encryptionsdk.exception.UnsupportedProviderException;
-<<<<<<< HEAD
 import com.amazonaws.encryptionsdk.keyrings.StandardKeyrings;
-=======
 import com.amazonaws.encryptionsdk.internal.AwsKmsCmkArnInfo;
->>>>>>> master
 import com.amazonaws.handlers.RequestHandler2;
-import com.amazonaws.regions.Region;
-import com.amazonaws.regions.Regions;
-import com.amazonaws.regions.RegionUtils;
 import com.amazonaws.services.kms.AWSKMS;
 import com.amazonaws.services.kms.AWSKMSClient;
 import com.amazonaws.services.kms.AWSKMSClientBuilder;
@@ -424,133 +401,6 @@ public class KmsMasterKeyProvider extends MasterKeyProvider<KmsMasterKey> implem
     }
 
     /**
-<<<<<<< HEAD
-     * Returns an instance of this object with default settings, default credentials, and configured
-     * to talk to the {@link Regions#DEFAULT_REGION}.
-     *
-     * @deprecated The default region set by this constructor is subject to change. Use the builder method to construct
-     * instances of this class for better control.
-     */
-    @Deprecated
-    public KmsMasterKeyProvider() {
-        this(defaultProvider(), Regions.DEFAULT_REGION.getName(), emptyList());
-    }
-
-
-    /**
-     * Returns an instance of this object with default settings and credentials configured to speak
-     * to the region specified by {@code keyId} (if specified). Data will be protected with
-     * {@code keyId} as appropriate.
-     *
-     * The default region will be set to that of the given key ID, or to the AWS SDK default region if a bare key ID or
-     * alias is passed.
-     *
-     * @deprecated The default region set by this constructor is subject to change. Use the builder method to construct
-     * instances of this class for better control.
-     */
-    @Deprecated
-    public KmsMasterKeyProvider(final String keyId) {
-        this(defaultProvider(), getStartingRegion(keyId).getName(), singletonList(keyId));
-    }
-
-    /**
-     * Returns an instance of this object with default settings configured to speak to the region
-     * specified by {@code keyId} (if specified). Data will be protected with {@code keyId} as
-     * appropriate.
-     *
-     * @deprecated The default region set by this constructor is subject to change. Use the builder method to construct
-     * instances of this class for better control.
-     */
-    @Deprecated
-    public KmsMasterKeyProvider(final AWSCredentials creds, final String keyId) {
-        this(new AWSStaticCredentialsProvider(creds), getStartingRegion(keyId), new ClientConfiguration(),
-             keyId);
-    }
-
-    /**
-     * Returns an instance of this object with default settings configured to speak to the region
-     * specified by {@code keyId} (if specified). Data will be protected with {@code keyId} as
-     * appropriate.
-     *
-     * The default region will be set to that of the given key ID, or to the AWS SDK default region if a bare key ID or
-     * alias is passed.
-     *
-     * @deprecated The default region set by this constructor is subject to change. Use the builder method to construct
-     * instances of this class for better control.
-     */
-    @Deprecated
-    public KmsMasterKeyProvider(final AWSCredentialsProvider creds, final String keyId) {
-        this(creds, getStartingRegion(keyId), new ClientConfiguration(), keyId);
-    }
-
-    /**
-     * Returns an instance of this object with default settings and configured to talk to the
-     * {@link Regions#DEFAULT_REGION}.
-     *
-     * @deprecated The default region set by this constructor is subject to change. Use the builder method to construct
-     * instances of this class for better control.
-     */
-    @Deprecated
-    public KmsMasterKeyProvider(final AWSCredentials creds) {
-        this(new AWSStaticCredentialsProvider(creds), Region.getRegion(Regions.DEFAULT_REGION), new ClientConfiguration(),
-                Collections.<String> emptyList());
-    }
-
-    /**
-     * Returns an instance of this object with default settings and configured to talk to the
-     * {@link Regions#DEFAULT_REGION}.
-     *
-     * @deprecated The default region set by this constructor is subject to change. Use the builder method to construct
-     * instances of this class for better control.
-     */
-    @Deprecated
-    public KmsMasterKeyProvider(final AWSCredentialsProvider creds) {
-        this(creds, Region.getRegion(Regions.DEFAULT_REGION), new ClientConfiguration(), Collections
-                .<String> emptyList());
-    }
-
-    /**
-     * Returns an instance of this object with the supplied configuration and credentials.
-     * {@code keyId} will be used to protect data.
-     */
-    public KmsMasterKeyProvider(final AWSCredentialsProvider creds, final Region region,
-            final ClientConfiguration clientConfiguration, final String keyId) {
-        this(creds, region, clientConfiguration, singletonList(keyId));
-    }
-
-    /**
-     * Returns an instance of this object with the supplied configuration and credentials. all keys
-     * listed in {@code keyIds} will be used to protect data.
-     */
-    public KmsMasterKeyProvider(final AWSCredentialsProvider creds, final Region region,
-            final ClientConfiguration clientConfiguration, final List<String> keyIds) {
-        this(builder().withClientBuilder(AWSKMSClientBuilder.standard()
-                                                            .withClientConfiguration(clientConfiguration)
-                                                            .withCredentials(creds))
-                      .clientFactory(),
-             region.getName(),
-             keyIds
-        );
-    }
-
-    /**
-     * Returns an instance of this object with the supplied client and region; the client will be
-     * configured to use the provided region. All keys listed in {@code keyIds} will be used to
-     * protect data.
-     *
-     * @deprecated This constructor modifies the passed-in KMS client by setting its region. This functionality may be
-     * removed in future releases. Use the builder to construct instances of this class instead.
-     */
-    @Deprecated
-    public KmsMasterKeyProvider(final AWSKMS kms, final Region region, final List<String> keyIds) {
-        this(requestedRegion -> kms, region.getName(), keyIds);
-
-        kms.setRegion(region);
-    }
-
-    /**
-=======
->>>>>>> master
      * Returns "aws-kms"
      */
     @Override

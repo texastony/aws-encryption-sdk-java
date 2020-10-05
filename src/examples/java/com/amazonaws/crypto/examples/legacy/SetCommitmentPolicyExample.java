@@ -1,7 +1,7 @@
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.amazonaws.crypto.examples;
+package com.amazonaws.crypto.examples.legacy;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -9,16 +9,19 @@ import java.util.Collections;
 import java.util.Map;
 
 import com.amazonaws.encryptionsdk.AwsCrypto;
-import com.amazonaws.encryptionsdk.CryptoAlgorithm;
+import com.amazonaws.encryptionsdk.CommitmentPolicy;
 import com.amazonaws.encryptionsdk.CryptoResult;
 import com.amazonaws.encryptionsdk.kms.KmsMasterKey;
 import com.amazonaws.encryptionsdk.kms.KmsMasterKeyProvider;
 
 /**
  * <p>
- * Configures a client with a specific encryption algorithm, then
- * encrypts and decrypts data using that encryption algorithm and
- * an AWS KMS customer master key.
+ * Configures a client with a specific commitment policy, then
+ * encrypts and decrypts data using an AWS KMS customer master key.
+ *
+ * This configuration should only be used as part of a migration from version 1.x to 2.x, or for advanced users
+ * with specialized requirements. We recommend that AWS Encryption SDK users use the default commitment policy
+ * whenever possible.
  *
  * <p>
  * Arguments:
@@ -27,7 +30,7 @@ import com.amazonaws.encryptionsdk.kms.KmsMasterKeyProvider;
  *    key (CMK), see 'Viewing Keys' at http://docs.aws.amazon.com/kms/latest/developerguide/viewing-keys.html
  * </ol>
  */
-public class SetEncryptionAlgorithmExample {
+public class SetCommitmentPolicyExample {
 
     private static final byte[] EXAMPLE_DATA = "Hello World".getBytes(StandardCharsets.UTF_8);
 
@@ -38,26 +41,26 @@ public class SetEncryptionAlgorithmExample {
     }
 
     static void encryptAndDecrypt(final String keyArn) {
-        // 1. Instantiate the SDK with the algorithm for encryption
+        // 1. Instantiate the SDK with a specific commitment policy
         //
-        // `withEncryptionAlgorithm(cryptoAlgorithm)` configures the client to encrypt
-        // using a specified encryption algorithm.
-        // This example sets the encryption algorithm to
-        // `CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY`,
-        // which is an algorithm that does not contain message signing.
+        // `withCommitmentPolicy(CommitmentPolicy)` configures the client with
+        // a commitment policy that dictates whether the client is required to encrypt
+        // using committing algorithms and whether the client must require that the messages
+        // it decrypts were encrypted using committing algorithms.
+        // In this example, we set the commitment policy to `ForbidEncryptAllowDecrypt`.
+        // This policy enforces that the client writes using non-committing algorithms,
+        // and allows decrypting of messages created with committing algorithms.
         //
-        // If this value is not set, the client encrypts with the recommended default:
-        // `CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384`.
+        // If this value is not set, the client is configured to use our recommended default:
+        // `RequireEncryptRequireDecrypt`.
+        // This policy enforces that the client uses committing algorithms
+        // to encrypt and enforces that the client only decrypts messages created with committing algorithms.
         // We recommend using the default whenever possible.
-        // For a description of our supported algorithms, see https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/supported-algorithms.html
-        //
-        // You can update the encryption algorithm after constructing the client
-        // by using `crypto.setEncryptionAlgorithm(CryptoAlgorithm)`.
         final AwsCrypto crypto = AwsCrypto.builder()
-                .withEncryptionAlgorithm(CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY)
+                .withCommitmentPolicy(CommitmentPolicy.ForbidEncryptAllowDecrypt)
                 .build();
 
-        // 2. Instantiate an AWS KMS master key provider in strict mode using buildStrict().
+        // 2. Instantiate an AWS KMS master key provider in strict mode using buildStrict()
         // In strict mode, the AWS KMS master key provider encrypts and decrypts only by using the key
         // indicated by keyArn.
         // To encrypt and decrypt with this master key provider, use an AWS KMS key ARN to identify the CMKs.

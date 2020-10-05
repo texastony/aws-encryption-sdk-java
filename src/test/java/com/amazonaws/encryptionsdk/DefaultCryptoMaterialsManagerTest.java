@@ -9,17 +9,10 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-<<<<<<< HEAD
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.same;
-=======
-import static org.junit.Assert.fail;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.same;
->>>>>>> master
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -36,13 +29,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-<<<<<<< HEAD
 import com.amazonaws.encryptionsdk.internal.TestKeyring;
 import com.amazonaws.encryptionsdk.keyrings.Keyring;
-import org.junit.Test;
-
-=======
->>>>>>> master
 import com.amazonaws.encryptionsdk.exception.AwsCryptoException;
 import com.amazonaws.encryptionsdk.exception.CannotUnwrapDataKeyException;
 import com.amazonaws.encryptionsdk.exception.NoSuchMasterKeyException;
@@ -60,21 +48,14 @@ import com.amazonaws.encryptionsdk.internal.TrailingSignatureAlgorithm;
 public class DefaultCryptoMaterialsManagerTest {
     private static final MasterKey<?> mk1 = new StaticMasterKey("mk1");
     private static final MasterKey<?> mk2 = new StaticMasterKey("mk2");
-<<<<<<< HEAD
     private static final Keyring keyring1 = new TestKeyring("keyring1");
-
-    @Test
-    public void encrypt_testBasicFunctionalityWithMkp() {
-        EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder().build();
-=======
     private static final CommitmentPolicy commitmentPolicy = TestUtils.DEFAULT_TEST_COMMITMENT_POLICY;
 
     @Test
-    public void encrypt_testBasicFunctionality() throws Exception {
+    public void encrypt_testBasicFunctionalityWithMkp() throws Exception {
         EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
-                                                                   .setCommitmentPolicy(commitmentPolicy)
-                                                                   .build();
->>>>>>> master
+            .setCommitmentPolicy(commitmentPolicy)
+            .build();
         EncryptionMaterials result = new DefaultCryptoMaterialsManager(mk1).getMaterialsForEncrypt(req);
 
         assertNotNull(result.getCleartextDataKey());
@@ -86,60 +67,81 @@ public class DefaultCryptoMaterialsManagerTest {
     }
 
     @Test
-<<<<<<< HEAD
     public void encrypt_testBasicFunctionalityWithKeyring() {
-        EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder().build();
+        EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
+            .setCommitmentPolicy(commitmentPolicy)
+            .build();
         EncryptionMaterials result = new DefaultCryptoMaterialsManager(keyring1).getMaterialsForEncrypt(req);
 
         assertNotNull(result.getAlgorithm());
         assertNotNull(result.getCleartextDataKey());
         assertNotNull(result.getEncryptionContext());
+        assertEquals(CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384, result.getAlgorithm());
         assertEquals(1, result.getEncryptedDataKeys().size());
         assertEquals(0, result.getMasterKeys().size());
     }
 
     @Test
-    public void encrypt_noSignatureKeyOnUnsignedAlgoWithMkp() {
-=======
-    public void encrypt_testNonCommittingDefaultAlgorithm() throws Exception {
+    public void encrypt_testNonCommittingDefaultAlgorithmWithMkp() throws Exception {
         EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
-                .setCommitmentPolicy(CommitmentPolicy.ForbidEncryptAllowDecrypt)
-                .build();
+            .setCommitmentPolicy(CommitmentPolicy.ForbidEncryptAllowDecrypt)
+            .build();
         EncryptionMaterials result = new DefaultCryptoMaterialsManager(mk1).getMaterialsForEncrypt(req);
         assertEquals(CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384, result.getAlgorithm());
     }
 
     @Test
-    public void encrypt_testCommittingDefaultAlgorithm() throws Exception {
+    public void encrypt_testNonCommittingDefaultAlgorithmWithKeyring() throws Exception {
+        EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
+            .setCommitmentPolicy(CommitmentPolicy.ForbidEncryptAllowDecrypt)
+            .build();
+        EncryptionMaterials result = new DefaultCryptoMaterialsManager(keyring1).getMaterialsForEncrypt(req);
+        assertEquals(CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384, result.getAlgorithm());
+    }
+
+    @Test
+    public void encrypt_testCommittingDefaultAlgorithmWithMkp() throws Exception {
         final List<CommitmentPolicy> requireWritePolicies = Arrays.asList(
-                CommitmentPolicy.RequireEncryptRequireDecrypt, CommitmentPolicy.RequireEncryptAllowDecrypt);
+            CommitmentPolicy.RequireEncryptRequireDecrypt, CommitmentPolicy.RequireEncryptAllowDecrypt);
         for (CommitmentPolicy policy : requireWritePolicies) {
             EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
-                    .setCommitmentPolicy(policy)
-                    .build();
+                .setCommitmentPolicy(policy)
+                .build();
             EncryptionMaterials result = new DefaultCryptoMaterialsManager(mk1).getMaterialsForEncrypt(req);
             assertEquals(CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384, result.getAlgorithm());
         }
     }
 
     @Test
-    public void encrypt_noSignatureKeyOnUnsignedAlgo() throws Exception {
->>>>>>> master
+    public void encrypt_testCommittingDefaultAlgorithmWithKeyring() throws Exception {
+        final List<CommitmentPolicy> requireWritePolicies = Arrays.asList(
+            CommitmentPolicy.RequireEncryptRequireDecrypt, CommitmentPolicy.RequireEncryptAllowDecrypt);
+        for (CommitmentPolicy policy : requireWritePolicies) {
+            EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
+                .setCommitmentPolicy(policy)
+                .build();
+            EncryptionMaterials result = new DefaultCryptoMaterialsManager(keyring1).getMaterialsForEncrypt(req);
+            assertEquals(CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384, result.getAlgorithm());
+        }
+    }
+
+    @Test
+    public void encrypt_noSignatureKeyOnUnsignedAlgoWithMkp() throws Exception {
         CryptoAlgorithm[] algorithms = new CryptoAlgorithm[] {
-                CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256,
-                CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_NO_KDF,
-                CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA256,
-                CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_NO_KDF,
-                CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256,
-                CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_NO_KDF,
-                CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY
+            CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256,
+            CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_NO_KDF,
+            CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA256,
+            CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_NO_KDF,
+            CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256,
+            CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_NO_KDF,
+            CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY
         };
 
         for (CryptoAlgorithm algo : algorithms) {
             EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
-                                                                       .setCommitmentPolicy(commitmentPolicy)
-                                                                       .setRequestedAlgorithm(algo)
-                                                                       .build();
+                .setCommitmentPolicy(commitmentPolicy)
+                .setRequestedAlgorithm(algo)
+                .build();
             EncryptionMaterials result = new DefaultCryptoMaterialsManager(mk1).getMaterialsForEncrypt(req);
 
             assertNull(result.getTrailingSignatureKey());
@@ -149,19 +151,22 @@ public class DefaultCryptoMaterialsManagerTest {
     }
 
     @Test
-    public void encrypt_noSignatureKeyOnUnsignedAlgoWithKeyring() {
+    public void encrypt_noSignatureKeyOnUnsignedAlgoWithKeyring() throws Exception {
         CryptoAlgorithm[] algorithms = new CryptoAlgorithm[] {
-                CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256,
-                CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_NO_KDF,
-                CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA256,
-                CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_NO_KDF,
-                CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256,
-                CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_NO_KDF
+            CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256,
+            CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_NO_KDF,
+            CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA256,
+            CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_NO_KDF,
+            CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256,
+            CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_NO_KDF,
+            CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY
         };
 
         for (CryptoAlgorithm algo : algorithms) {
-            EncryptionMaterialsRequest req
-                    = EncryptionMaterialsRequest.newBuilder().setRequestedAlgorithm(algo).build();
+            EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
+                .setCommitmentPolicy(commitmentPolicy)
+                .setRequestedAlgorithm(algo)
+                .build();
             EncryptionMaterials result = new DefaultCryptoMaterialsManager(keyring1).getMaterialsForEncrypt(req);
 
             assertNull(result.getTrailingSignatureKey());
@@ -171,22 +176,21 @@ public class DefaultCryptoMaterialsManagerTest {
     }
 
     @Test
-    public void encrypt_hasSignatureKeyForSignedAlgoWithMkp() {
+    public void encrypt_hasSignatureKeyForSignedAlgoWithMkp() throws Exception {
         CryptoAlgorithm[] algorithms = new CryptoAlgorithm[] {
-                CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256_ECDSA_P256,
-                CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384,
-                CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384,
-                CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384
+            CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256_ECDSA_P256,
+            CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384,
+            CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384,
+            CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384
         };
 
         for (CryptoAlgorithm algo : algorithms) {
 
             EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
-                                                                       .setCommitmentPolicy(commitmentPolicy)
-                                                                       .setRequestedAlgorithm(algo)
-                                                                       .build();
+                .setCommitmentPolicy(commitmentPolicy)
+                .setRequestedAlgorithm(algo)
+                .build();
             EncryptionMaterials result = new DefaultCryptoMaterialsManager(mk1).getMaterialsForEncrypt(req);
-
 
             assertNotNull(result.getTrailingSignatureKey());
             assertEquals(1, result.getEncryptionContext().size());
@@ -196,17 +200,20 @@ public class DefaultCryptoMaterialsManagerTest {
     }
 
     @Test
-    public void encrypt_hasSignatureKeyForSignedAlgoWithKeyring() {
+    public void encrypt_hasSignatureKeyForSignedAlgoWithKeyring() throws Exception {
         CryptoAlgorithm[] algorithms = new CryptoAlgorithm[] {
-                CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256_ECDSA_P256,
-                CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384,
-                CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384
+            CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256_ECDSA_P256,
+            CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384,
+            CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384,
+            CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384
         };
 
         for (CryptoAlgorithm algo : algorithms) {
 
-            EncryptionMaterialsRequest req
-                    = EncryptionMaterialsRequest.newBuilder().setRequestedAlgorithm(algo).build();
+            EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
+                .setCommitmentPolicy(commitmentPolicy)
+                .setRequestedAlgorithm(algo)
+                .build();
             EncryptionMaterials result = new DefaultCryptoMaterialsManager(keyring1).getMaterialsForEncrypt(req);
 
             assertNotNull(result.getTrailingSignatureKey());
@@ -321,16 +328,10 @@ public class DefaultCryptoMaterialsManagerTest {
     }
 
     @Test(expected = IllegalArgumentException.class)
-<<<<<<< HEAD
     public void encrypt_whenNoMasterKeys_throws() {
-        EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder().build();
-
-=======
-    public void encrypt_whenNoMasterKeys_throws() throws Exception {
         EncryptionMaterialsRequest req = EncryptionMaterialsRequest.newBuilder()
                                                                    .setCommitmentPolicy(commitmentPolicy)
                                                                    .build();
->>>>>>> master
         new DefaultCryptoMaterialsManager(new MasterKeyProvider() {
             @Override public String getDefaultProviderId() {
                 return "provider ID";

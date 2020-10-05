@@ -3,19 +3,12 @@
 
 package com.amazonaws.encryptionsdk.kms;
 
-<<<<<<< HEAD
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-=======
-import static com.amazonaws.encryptionsdk.TestUtils.assertThrows;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
->>>>>>> master
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
@@ -32,14 +25,10 @@ import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
-<<<<<<< HEAD
 import com.amazonaws.encryptionsdk.TestUtils;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-=======
 import org.junit.Before;
-import org.junit.Test;
->>>>>>> master
 import org.mockito.ArgumentCaptor;
 
 import com.amazonaws.AbortedException;
@@ -57,7 +46,6 @@ import com.amazonaws.encryptionsdk.MasterKeyProvider;
 import com.amazonaws.encryptionsdk.exception.AwsCryptoException;
 import com.amazonaws.encryptionsdk.exception.CannotUnwrapDataKeyException;
 import com.amazonaws.encryptionsdk.internal.VersionInfo;
-import com.amazonaws.encryptionsdk.CommitmentPolicy;
 import com.amazonaws.encryptionsdk.model.KeyBlob;
 import com.amazonaws.encryptionsdk.kms.KmsMasterKeyProvider.RegionalClientSupplier;
 import com.amazonaws.handlers.RequestHandler2;
@@ -65,11 +53,8 @@ import com.amazonaws.http.exception.HttpRequestTimeoutException;
 import com.amazonaws.services.kms.AWSKMS;
 import com.amazonaws.services.kms.AWSKMSClientBuilder;
 
-<<<<<<< HEAD
 @Tag(TestUtils.TAG_INTEGRATION)
 class KMSProviderBuilderIntegrationTests {
-=======
-public class KMSProviderBuilderIntegrationTests {
 
     private static final String AWS_KMS_PROVIDER_ID = "aws-kms";
 
@@ -78,7 +63,7 @@ public class KMSProviderBuilderIntegrationTests {
     private RegionalClientSupplier testClientSupplier__;
 
     @Before
-    public void setup() {
+    void setup() {
         testUSWestClient__ = spy(AWSKMSClientBuilder.standard().withRegion("us-west-2").build());
         testEUCentralClient__ = spy(AWSKMSClientBuilder.standard().withRegion("eu-central-1").build());
         testClientSupplier__ = regionName -> {
@@ -92,14 +77,13 @@ public class KMSProviderBuilderIntegrationTests {
         };
     }
 
->>>>>>> master
     @Test
     void whenBogusRegionsDecrypted_doesNotLeakClients() {
         AtomicReference<ConcurrentHashMap<String, AWSKMS>> kmsCache = new AtomicReference<>();
 
         KmsMasterKeyProvider mkp = (new KmsMasterKeyProvider.Builder() {
             @Override protected void snoopClientCache(
-                    final ConcurrentHashMap<String, AWSKMS> map
+                final ConcurrentHashMap<String, AWSKMS> map
             ) {
                 kmsCache.set(map);
             }
@@ -107,15 +91,15 @@ public class KMSProviderBuilderIntegrationTests {
 
         try {
             mkp.decryptDataKey(
-                    CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256,
-                    Collections.singleton(
-                            new KeyBlob("aws-kms",
-                                        "arn:aws:kms:us-bogus-1:123456789010:key/b3537ef1-d8dc-4780-9f5a-55776cbb2f7f"
-                                                .getBytes(StandardCharsets.UTF_8),
-                                        new byte[40]
-                            )
-                    ),
-                    new HashMap<>()
+                CryptoAlgorithm.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256,
+                Collections.singleton(
+                    new KeyBlob("aws-kms",
+                        "arn:aws:kms:us-bogus-1:123456789010:key/b3537ef1-d8dc-4780-9f5a-55776cbb2f7f"
+                            .getBytes(StandardCharsets.UTF_8),
+                        new byte[40]
+                    )
+                ),
+                new HashMap<>()
             );
             fail("Expected CannotUnwrapDataKeyException");
         } catch (CannotUnwrapDataKeyException e) {
@@ -131,7 +115,7 @@ public class KMSProviderBuilderIntegrationTests {
 
         KmsMasterKeyProvider mkp = (new KmsMasterKeyProvider.Builder() {
             @Override protected void snoopClientCache(
-                    final ConcurrentHashMap<String, AWSKMS> map
+                final ConcurrentHashMap<String, AWSKMS> map
             ) {
                 kmsCache.set(map);
             }
@@ -149,50 +133,26 @@ public class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-<<<<<<< HEAD
     void whenConstructedWithoutArguments_canUseMultipleRegions() {
-        KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder().build();
-=======
-    public void whenConstructedWithoutArguments_canUseMultipleRegions() throws Exception {
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder().buildDiscovery();
->>>>>>> master
 
         for (String key : KMSTestFixtures.TEST_KEY_IDS) {
             byte[] ciphertext =
-                    AwsCrypto.standard().encryptData(
-                            KmsMasterKeyProvider.builder()
-                                .buildStrict(key),
-                            new byte[1]
-                    ).getResult();
+                AwsCrypto.standard().encryptData(
+                    KmsMasterKeyProvider.builder()
+                        .buildStrict(key),
+                    new byte[1]
+                ).getResult();
 
             AwsCrypto.standard().decryptData(mkp, ciphertext);
         }
     }
 
-<<<<<<< HEAD
-    @SuppressWarnings("deprecation") @Test
-    void whenLegacyConstructorsUsed_multiRegionDecryptIsNotSupported() {
-        KmsMasterKeyProvider mkp = new KmsMasterKeyProvider();
-
-        assertThrows(CannotUnwrapDataKeyException.class, () -> {
-            for (String key : KMSTestFixtures.TEST_KEY_IDS) {
-                byte[] ciphertext =
-                        new AwsCrypto().encryptData(
-                                KmsMasterKeyProvider.builder()
-                                        .withKeysForEncryption(key)
-                                        .build(),
-                                new byte[1]
-                        ).getResult();
-
-                new AwsCrypto().decryptData(mkp, ciphertext);
-            }
-        });
-=======
     @Test
-    public void whenConstructedInStrictMode_encryptDecrypt() throws Exception {
+    void whenConstructedInStrictMode_encryptDecrypt() {
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                                                       .withCustomClientFactory(testClientSupplier__)
-                                                       .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
+            .withCustomClientFactory(testClientSupplier__)
+            .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
 
         byte[] ciphertext = AwsCrypto.standard().encryptData(mkp, new byte[1]).getResult();
         verify(testUSWestClient__, times(1)).generateDataKey(any());
@@ -202,12 +162,12 @@ public class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    public void whenConstructedInStrictMode_encryptDecryptMultipleCmks() throws Exception {
+    void whenConstructedInStrictMode_encryptDecryptMultipleCmks() {
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                                                       .withCustomClientFactory(testClientSupplier__)
-                                                       .buildStrict(
-                                                               KMSTestFixtures.US_WEST_2_KEY_ID,
-                                                               KMSTestFixtures.EU_CENTRAL_1_KEY_ID);
+            .withCustomClientFactory(testClientSupplier__)
+            .buildStrict(
+                KMSTestFixtures.US_WEST_2_KEY_ID,
+                KMSTestFixtures.EU_CENTRAL_1_KEY_ID);
 
         byte[] ciphertext = AwsCrypto.standard().encryptData(mkp, new byte[1]).getResult();
         verify(testUSWestClient__, times(1)).generateDataKey(any());
@@ -218,13 +178,13 @@ public class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    public void whenConstructedInStrictMode_encryptSingleBadKeyIdFails() throws Exception {
+    void whenConstructedInStrictMode_encryptSingleBadKeyIdFails() {
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                                                       .withCustomClientFactory(testClientSupplier__)
-                                                       .withDefaultRegion("us-west-2")
-                                                       .buildStrict(
-                                                               KMSTestFixtures.US_WEST_2_KEY_ID,
-                                                               "badKeyId");
+            .withCustomClientFactory(testClientSupplier__)
+            .withDefaultRegion("us-west-2")
+            .buildStrict(
+                KMSTestFixtures.US_WEST_2_KEY_ID,
+                "badKeyId");
 
         assertThrows(AwsCryptoException.class, () -> AwsCrypto.standard().encryptData(mkp, new byte[1]).getResult());
         verify(testUSWestClient__, times(1)).generateDataKey(any());
@@ -232,11 +192,11 @@ public class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-    public void whenConstructedInStrictMode_decryptBadEDKFails() throws Exception {
+    void whenConstructedInStrictMode_decryptBadEDKFails() {
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                                                       .withCustomClientFactory(testClientSupplier__)
-                                                       .withDefaultRegion("us-west-2")
-                                                       .buildStrict("badKeyId");
+            .withCustomClientFactory(testClientSupplier__)
+            .withDefaultRegion("us-west-2")
+            .buildStrict("badKeyId");
 
         final CryptoAlgorithm algSuite = CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
         final Map<String, String> encCtx = Collections.singletonMap("myKey", "myValue");
@@ -244,30 +204,30 @@ public class KMSProviderBuilderIntegrationTests {
             "badKeyId".getBytes(StandardCharsets.UTF_8), new byte[algSuite.getDataKeyLength()]);
 
         assertThrows(CannotUnwrapDataKeyException.class, () ->
-                mkp.decryptDataKey(algSuite, Collections.singletonList(badEDK), encCtx));
+            mkp.decryptDataKey(algSuite, Collections.singletonList(badEDK), encCtx));
         verify(testUSWestClient__, times(1)).decrypt(any());
     }
 
     @Test
-    public void whenConstructedInDiscoveryMode_decrypt() throws Exception {
+    void whenConstructedInDiscoveryMode_decrypt() {
         KmsMasterKeyProvider singleCmkMkp = KmsMasterKeyProvider.builder()
-                                                                .withCustomClientFactory(testClientSupplier__)
-                                                                .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
+            .withCustomClientFactory(testClientSupplier__)
+            .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
         byte[] singleCmkCiphertext = AwsCrypto.standard().encryptData(singleCmkMkp, new byte[1]).getResult();
 
         KmsMasterKeyProvider mkpToTest = KmsMasterKeyProvider.builder()
-                                                            .withCustomClientFactory(testClientSupplier__)
-                                                            .buildDiscovery();
+            .withCustomClientFactory(testClientSupplier__)
+            .buildDiscovery();
         AwsCrypto.standard().decryptData(mkpToTest, singleCmkCiphertext);
         verify(testUSWestClient__, times(1)).decrypt(any());
     }
 
     @Test
-    public void whenConstructedInDiscoveryMode_decryptBadEDKFails() throws Exception {
+    void whenConstructedInDiscoveryMode_decryptBadEDKFails() {
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                                                       .withCustomClientFactory(testClientSupplier__)
-                                                       .withDefaultRegion("us-west-2")
-                                                       .buildDiscovery();
+            .withCustomClientFactory(testClientSupplier__)
+            .withDefaultRegion("us-west-2")
+            .buildDiscovery();
 
         final CryptoAlgorithm algSuite = CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
         final Map<String, String> encCtx = Collections.singletonMap("myKey", "myValue");
@@ -275,37 +235,37 @@ public class KMSProviderBuilderIntegrationTests {
             "badKeyId".getBytes(StandardCharsets.UTF_8), new byte[algSuite.getDataKeyLength()]);
 
         assertThrows(CannotUnwrapDataKeyException.class, () ->
-                mkp.decryptDataKey(algSuite, Collections.singletonList(badEDK), encCtx));
+            mkp.decryptDataKey(algSuite, Collections.singletonList(badEDK), encCtx));
         verify(testUSWestClient__, times(1)).decrypt(any());
     }
 
 
     @Test
-    public void whenConstructedWithDiscoveryFilter_decrypt() throws Exception {
+    void whenConstructedWithDiscoveryFilter_decrypt() {
         KmsMasterKeyProvider singleCmkMkp = KmsMasterKeyProvider.builder()
-                                                                .withCustomClientFactory(testClientSupplier__)
-                                                                .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
+            .withCustomClientFactory(testClientSupplier__)
+            .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
 
         byte[] singleCmkCiphertext = AwsCrypto.standard().encryptData(singleCmkMkp, new byte[1]).getResult();
 
         KmsMasterKeyProvider mkpToTest = KmsMasterKeyProvider.builder()
-                                                                .withCustomClientFactory(testClientSupplier__)
-                                                                .buildDiscovery(new DiscoveryFilter(
-                                                                        KMSTestFixtures.PARTITION,
-                                                                        Arrays.asList(KMSTestFixtures.ACCOUNT_ID)));
+            .withCustomClientFactory(testClientSupplier__)
+            .buildDiscovery(new DiscoveryFilter(
+                KMSTestFixtures.PARTITION,
+                Arrays.asList(KMSTestFixtures.ACCOUNT_ID)));
 
         AwsCrypto.standard().decryptData(mkpToTest, singleCmkCiphertext);
         verify(testUSWestClient__, times(1)).decrypt(any());
     }
 
     @Test
-    public void whenConstructedWithDiscoveryFilter_decryptBadEDKFails() throws Exception {
+    void whenConstructedWithDiscoveryFilter_decryptBadEDKFails() {
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                                                       .withCustomClientFactory(testClientSupplier__)
-                                                       .withDefaultRegion("us-west-2")
-                                                       .buildDiscovery(new DiscoveryFilter(
-                                                               KMSTestFixtures.PARTITION,
-                                                               Arrays.asList(KMSTestFixtures.ACCOUNT_ID)));
+            .withCustomClientFactory(testClientSupplier__)
+            .withDefaultRegion("us-west-2")
+            .buildDiscovery(new DiscoveryFilter(
+                KMSTestFixtures.PARTITION,
+                Arrays.asList(KMSTestFixtures.ACCOUNT_ID)));
 
         final CryptoAlgorithm algSuite = CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
         final Map<String, String> encCtx = Collections.singletonMap("myKey", "myValue");
@@ -314,21 +274,20 @@ public class KMSProviderBuilderIntegrationTests {
             badARN.getBytes(StandardCharsets.UTF_8), new byte[algSuite.getDataKeyLength()]);
 
         assertThrows(CannotUnwrapDataKeyException.class, () ->
-                mkp.decryptDataKey(algSuite, Collections.singletonList(badEDK), encCtx));
+            mkp.decryptDataKey(algSuite, Collections.singletonList(badEDK), encCtx));
         verify(testUSWestClient__, times(1)).decrypt(any());
->>>>>>> master
     }
 
     @Test
     void whenHandlerConfigured_handlerIsInvoked() {
         RequestHandler2 handler = spy(new RequestHandler2() {});
         KmsMasterKeyProvider mkp =
-                KmsMasterKeyProvider.builder()
-                                    .withClientBuilder(
-                                            AWSKMSClientBuilder.standard()
-                                                               .withRequestHandlers(handler)
-                                    )
-                                    .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
+            KmsMasterKeyProvider.builder()
+                .withClientBuilder(
+                    AWSKMSClientBuilder.standard()
+                        .withRequestHandlers(handler)
+                )
+                .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
 
         AwsCrypto.standard().encryptData(mkp, new byte[1]);
 
@@ -340,14 +299,14 @@ public class KMSProviderBuilderIntegrationTests {
         // By setting a timeout of 1ms, it's not physically possible to complete both the us-west-2 and eu-central-1
         // requests due to speed of light limits.
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                                                       .withClientBuilder(
-                                                               AWSKMSClientBuilder.standard()
-                                                                .withClientConfiguration(
-                                                                        new ClientConfiguration()
-                                                                            .withRequestTimeout(1)
-                                                                )
-                                                       )
-                                                       .buildStrict(Arrays.asList(KMSTestFixtures.TEST_KEY_IDS));
+            .withClientBuilder(
+                AWSKMSClientBuilder.standard()
+                    .withClientConfiguration(
+                        new ClientConfiguration()
+                            .withRequestTimeout(1)
+                    )
+            )
+            .buildStrict(Arrays.asList(KMSTestFixtures.TEST_KEY_IDS));
 
         try {
             AwsCrypto.standard().encryptData(mkp, new byte[1]);
@@ -368,8 +327,8 @@ public class KMSProviderBuilderIntegrationTests {
         AWSCredentialsProvider customProvider = spy(new DefaultAWSCredentialsProviderChain());
 
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                                                       .withCredentials(customProvider)
-                                                       .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
+            .withCredentials(customProvider)
+            .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
 
         AwsCrypto.standard().encryptData(mkp, new byte[1]);
 
@@ -378,8 +337,8 @@ public class KMSProviderBuilderIntegrationTests {
         AWSCredentials customCredentials = spy(customProvider.getCredentials());
 
         mkp = KmsMasterKeyProvider.builder()
-                                                       .withCredentials(customCredentials)
-                                                       .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
+            .withCredentials(customCredentials)
+            .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
 
         AwsCrypto.standard().encryptData(mkp, new byte[1]);
 
@@ -387,22 +346,18 @@ public class KMSProviderBuilderIntegrationTests {
     }
 
     @Test
-<<<<<<< HEAD
-    void whenBuilderCloned_credentialsAndConfigurationAreRetained() {
-=======
-    public void whenBuilderCloned_configurationIsRetained() throws Exception {
->>>>>>> master
+    void whenBuilderCloned_configurationIsRetained() {
         AWSCredentialsProvider customProvider1 = spy(new DefaultAWSCredentialsProviderChain());
         AWSCredentialsProvider customProvider2 = spy(new DefaultAWSCredentialsProviderChain());
 
         KmsMasterKeyProvider.Builder builder = KmsMasterKeyProvider.builder()
-                .withCredentials(customProvider1);
+            .withCredentials(customProvider1);
 
         KmsMasterKeyProvider.Builder builder2 = builder.clone();
 
         // This will mutate the first builder to change the creds, but leave the clone unchanged.
         MasterKeyProvider<?> mkp2 = builder.withCredentials(customProvider2)
-                .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
+            .buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
         MasterKeyProvider<?> mkp1 = builder2.buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
 
         CryptoResult<byte[], ?> result = AwsCrypto.standard().encryptData(mkp1, new byte[0]);
@@ -423,10 +378,10 @@ public class KMSProviderBuilderIntegrationTests {
         RequestHandler2 handler = spy(new RequestHandler2() {});
 
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                .withClientBuilder(
-                        AWSKMSClientBuilder.standard().withRequestHandlers(handler)
-                )
-                .clone().buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
+            .withClientBuilder(
+                AWSKMSClientBuilder.standard().withRequestHandlers(handler)
+            )
+            .clone().buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
 
         AwsCrypto.standard().encryptData(mkp, new byte[0]);
 
@@ -436,14 +391,14 @@ public class KMSProviderBuilderIntegrationTests {
     @Test
     void whenBogusEndpointIsSet_constructionFails() {
         assertThrows(IllegalArgumentException.class, () -> KmsMasterKeyProvider.builder()
-                            .withClientBuilder(
-                                    AWSKMSClientBuilder.standard()
-                                                       .withEndpointConfiguration(
-                                                               new AwsClientBuilder.EndpointConfiguration(
-                                                                       "https://this.does.not.exist.example.com",
-                                                                       "bad-region")
-                                                       )
-                            ));
+            .withClientBuilder(
+                AWSKMSClientBuilder.standard()
+                    .withEndpointConfiguration(
+                        new AwsClientBuilder.EndpointConfiguration(
+                            "https://this.does.not.exist.example.com",
+                            "bad-region")
+                    )
+            ));
     }
 
     @Test
@@ -451,15 +406,15 @@ public class KMSProviderBuilderIntegrationTests {
         RequestHandler2 handler = spy(new RequestHandler2() {});
 
         KmsMasterKeyProvider mkp = KmsMasterKeyProvider.builder()
-                                                       .withClientBuilder(
-                                                               AWSKMSClientBuilder.standard().withRequestHandlers(handler)
-                                                               .withClientConfiguration(
-                                                                       new ClientConfiguration()
-                                                                           .withUserAgentPrefix("TEST-UA-PREFIX")
-                                                                           .withUserAgentSuffix("TEST-UA-SUFFIX")
-                                                               )
-                                                       )
-                                                       .clone().buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
+            .withClientBuilder(
+                AWSKMSClientBuilder.standard().withRequestHandlers(handler)
+                    .withClientConfiguration(
+                        new ClientConfiguration()
+                            .withUserAgentPrefix("TEST-UA-PREFIX")
+                            .withUserAgentSuffix("TEST-UA-SUFFIX")
+                    )
+            )
+            .clone().buildStrict(KMSTestFixtures.TEST_KEY_IDS[0]);
 
         AwsCrypto.standard().encryptData(mkp, new byte[0]);
 
@@ -478,4 +433,3 @@ public class KMSProviderBuilderIntegrationTests {
         // TODO: Need to set up a role to assume as bare key IDs are relative to the caller account
     }
 }
-

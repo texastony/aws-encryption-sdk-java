@@ -18,9 +18,7 @@ import java.util.Map;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 
-<<<<<<< HEAD
 import com.amazonaws.encryptionsdk.keyrings.Keyring;
-=======
 import com.amazonaws.encryptionsdk.CommitmentPolicy;
 import com.amazonaws.encryptionsdk.model.CiphertextFooters;
 import com.amazonaws.encryptionsdk.model.CiphertextHeaders;
@@ -28,7 +26,6 @@ import com.amazonaws.encryptionsdk.model.CiphertextType;
 import com.amazonaws.encryptionsdk.model.ContentType;
 import com.amazonaws.encryptionsdk.model.EncryptionMaterials;
 import com.amazonaws.encryptionsdk.model.KeyBlob;
->>>>>>> master
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.ASN1Sequence;
@@ -42,7 +39,7 @@ import com.amazonaws.encryptionsdk.exception.BadCiphertextException;
 /**
  * This class implements the CryptoHandler interface by providing methods for the encryption of
  * plaintext data.
- * 
+ *
  * <p>
  * This class creates the ciphertext headers and delegates the encryption of the plaintext to the
  * {@link BlockEncryptionHandler} or {@link FrameEncryptionHandler} based on the content type.

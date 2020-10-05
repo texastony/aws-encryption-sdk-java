@@ -1,3 +1,6 @@
+// Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package com.amazonaws.encryptionsdk;
 
 import static com.amazonaws.encryptionsdk.AwsCrypto.getDefaultCryptoAlgorithm;
@@ -36,6 +39,8 @@ public class DefaultCryptoMaterialsManager implements CryptoMaterialsManager {
     private final Keyring keyring;
     private final MasterKeyProvider<?> mkp;
 
+    private final CryptoAlgorithm DEFAULT_CRYPTO_ALGORITHM = CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384;
+
     /**
      * @param masterKeyProvider The master key provider to delegate to
      *
@@ -57,10 +62,20 @@ public class DefaultCryptoMaterialsManager implements CryptoMaterialsManager {
         this.mkp = null;
     }
 
+<<<<<<< HEAD
     @Override
     public EncryptionMaterials getMaterialsForEncrypt(EncryptionMaterialsRequest request) {
         if(keyring != null) {
             return getEncryptionMaterialsForKeyring(request);
+=======
+        CryptoAlgorithm algo = request.getRequestedAlgorithm();
+        CommitmentPolicy commitmentPolicy = request.getCommitmentPolicy();
+        // Set default according to commitment policy
+        if (algo == null && commitmentPolicy == CommitmentPolicy.ForbidEncryptAllowDecrypt) {
+            algo = CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384;
+        } else if (algo == null) {
+            algo = CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384;
+>>>>>>> master
         }
 
         return getEncryptionMaterialsForMasterKeyProvider(request);

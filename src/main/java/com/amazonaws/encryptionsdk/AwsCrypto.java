@@ -1,15 +1,5 @@
-/*
- * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except
- * in compliance with the License. A copy of the License is located at
- * 
- * http://aws.amazon.com/apache2.0
- * 
- * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- */
+// Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.amazonaws.encryptionsdk;
 
@@ -104,12 +94,94 @@ import static java.util.Objects.requireNonNull;
 public class AwsCrypto {
     private static final Map<String, String> EMPTY_MAP = Collections.emptyMap();
 
-    /**
-     * Returns the {@link CryptoAlgorithm} to be used for encryption when none is explicitly
-     * selected. Currently it is {@link CryptoAlgorithm#ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384}.
-     */
-    public static CryptoAlgorithm getDefaultCryptoAlgorithm() {
-        return CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384;
+    // These are volatile because we allow unsynchronized writes via our setters,
+    // and without setting volatile we could see strange results.
+    // E.g. copying these to a local might give different values on subsequent reads from the local.
+    // By setting them volatile we ensure that proper memory barriers are applied
+    // to ensure things behave in a sensible manner.
+    private volatile CryptoAlgorithm encryptionAlgorithm_ = null;
+    private volatile int encryptionFrameSize_ = getDefaultFrameSize();
+
+    private static final CommitmentPolicy DEFAULT_COMMITMENT_POLICY = CommitmentPolicy.RequireEncryptRequireDecrypt;
+    private final CommitmentPolicy commitmentPolicy_;
+
+    private AwsCrypto(Builder builder) {
+        commitmentPolicy_ = builder.commitmentPolicy_ == null ? DEFAULT_COMMITMENT_POLICY : builder.commitmentPolicy_;
+        if (builder.encryptionAlgorithm_ != null && !commitmentPolicy_.algorithmAllowedForEncrypt(builder.encryptionAlgorithm_)) {
+            if (commitmentPolicy_ == CommitmentPolicy.ForbidEncryptAllowDecrypt) {
+                throw new AwsCryptoException("Configuration conflict. Cannot encrypt due to CommitmentPolicy " +
+                        commitmentPolicy_ + " requiring only non-committed messages. Algorithm ID was " +
+                        builder.encryptionAlgorithm_ +
+                        ". See: https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/troubleshooting-migration.html");
+            } else {
+                throw new AwsCryptoException("Configuration conflict. Cannot encrypt due to CommitmentPolicy " +
+                        commitmentPolicy_ + " requiring only committed messages. Algorithm ID was " +
+                        builder.encryptionAlgorithm_ +
+                        ". See: https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/troubleshooting-migration.html");
+            }
+        }
+        encryptionAlgorithm_ = builder.encryptionAlgorithm_;
+        encryptionFrameSize_ = builder.encryptionFrameSize_;
+    }
+
+    public static class Builder {
+        private CryptoAlgorithm encryptionAlgorithm_;
+        private int encryptionFrameSize_ = getDefaultFrameSize();
+        private CommitmentPolicy commitmentPolicy_;
+
+        private Builder() {}
+
+        /**
+         * Sets the {@link CryptoAlgorithm} to encrypt with.
+         * The Aws Crypto client will use the last crypto algorithm set with
+         * either {@link AwsCrypto.Builder#withEncryptionAlgorithm(CryptoAlgorithm)} or
+         * {@link #setEncryptionAlgorithm(CryptoAlgorithm)} to encrypt with.
+         *
+         * @param encryptionAlgorithm The {@link CryptoAlgorithm}
+         * @return The Builder, for method chaining
+         */
+        public Builder withEncryptionAlgorithm(CryptoAlgorithm encryptionAlgorithm) {
+            this.encryptionAlgorithm_ = encryptionAlgorithm;
+            return this;
+        }
+
+        /**
+         * Sets the frame size of the encrypted messages that the Aws Crypto client produces.
+         * The Aws Crypto client will use the last frame size set with
+         * either {@link AwsCrypto.Builder#withEncryptionFrameSize(int)} or
+         * {@link #setEncryptionFrameSize(int)}.
+         *
+         * @param frameSize The frame size to produce encrypted messages with.
+         * @return The Builder, for method chaining
+         */
+        public Builder withEncryptionFrameSize(int frameSize) {
+            this.encryptionFrameSize_ = frameSize;
+            return this;
+        }
+
+        /**
+         * Sets the {@link CommitmentPolicy} of this Aws Crypto client.
+         *
+         * @param commitmentPolicy The commitment policy to enforce during encryption and decryption
+         * @return The Builder, for method chaining
+         */
+        public Builder withCommitmentPolicy(CommitmentPolicy commitmentPolicy) {
+            Utils.assertNonNull(commitmentPolicy, "commitmentPolicy");
+            this.commitmentPolicy_ = commitmentPolicy;
+            return this;
+        }
+
+        public AwsCrypto build() {
+            return new AwsCrypto(this);
+        }
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static AwsCrypto standard() {
+        return AwsCrypto.builder().build();
     }
 
     /**
@@ -120,18 +192,22 @@ public class AwsCrypto {
         return 4096;
     }
 
-    // These are volatile because we allow unsynchronized writes via our setters, and without setting volatile we could
-    // see strange results - e.g. copying these to a local might give different values on subsequent reads from the
-    // local. By setting them volatile we ensure that proper memory barriers are applied to ensure things behave in a
-    // sensible manner.
-    private volatile CryptoAlgorithm encryptionAlgorithm_ = null;
-    private volatile int encryptionFrameSize_ = getDefaultFrameSize();
-
     /**
      * Sets the {@link CryptoAlgorithm} to use when <em>encrypting</em> data. This has no impact on
      * decryption.
      */
     public void setEncryptionAlgorithm(final CryptoAlgorithm alg) {
+        if (!commitmentPolicy_.algorithmAllowedForEncrypt(alg)) {
+            if (commitmentPolicy_ == CommitmentPolicy.ForbidEncryptAllowDecrypt) {
+                throw new AwsCryptoException("Configuration conflict. Cannot encrypt due to CommitmentPolicy " +
+                        commitmentPolicy_ + " requiring only non-committed messages. Algorithm ID was " +
+                        alg + ". See: https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/troubleshooting-migration.html");
+            } else {
+                throw new AwsCryptoException("Configuration conflict. Cannot encrypt due to CommitmentPolicy " +
+                        commitmentPolicy_ + " requiring only committed messages. Algorithm ID was " +
+                        alg + ". See: https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/troubleshooting-migration.html");
+            }
+        }
         encryptionAlgorithm_ = alg;
     }
 
@@ -191,11 +267,31 @@ public class AwsCrypto {
             final int plaintextSize,
             final Map<String, String> encryptionContext
     ) {
+<<<<<<< HEAD
         return estimateCiphertextSize(EstimateCiphertextSizeRequest.builder()
                 .cryptoMaterialsManager(materialsManager)
                 .encryptionContext(encryptionContext)
                 .plaintextSize(plaintextSize)
                 .build());
+=======
+        EncryptionMaterialsRequest request = EncryptionMaterialsRequest.newBuilder()
+                                                                       .setContext(encryptionContext)
+                                                                       .setRequestedAlgorithm(getEncryptionAlgorithm())
+        // We're not actually encrypting any data, so don't consume any bytes from the cache's limits. We do need to
+        // pass /something/ though, or the cache will be bypassed (as it'll assume this is a streaming encrypt of
+        // unknown size).
+                                                                       .setPlaintextSize(0)
+                                                                       .setCommitmentPolicy(commitmentPolicy_)
+                                                                       .build();
+
+        final MessageCryptoHandler cryptoHandler = new EncryptionHandler(
+                getEncryptionFrameSize(),
+                checkAlgorithm(materialsManager.getMaterialsForEncrypt(request)),
+                commitmentPolicy_
+        );
+
+        return cryptoHandler.estimateOutputSize(plaintextSize);
+>>>>>>> master
     }
 
     /**
@@ -305,10 +401,35 @@ public class AwsCrypto {
             final byte[] plaintext,
             final Map<String, String> encryptionContext
     ) {
+<<<<<<< HEAD
         return encrypt(EncryptRequest.builder()
                 .cryptoMaterialsManager(materialsManager)
                 .plaintext(plaintext)
                 .encryptionContext(encryptionContext).build()).toCryptoResult();
+=======
+        EncryptionMaterialsRequest request = EncryptionMaterialsRequest.newBuilder()
+                                                                       .setContext(encryptionContext)
+                                                                       .setRequestedAlgorithm(getEncryptionAlgorithm())
+                                                                       .setPlaintext(plaintext)
+                                                                       .setCommitmentPolicy(commitmentPolicy_)
+                                                                       .build();
+
+        final MessageCryptoHandler cryptoHandler = new EncryptionHandler(
+                getEncryptionFrameSize(),
+                checkAlgorithm(materialsManager.getMaterialsForEncrypt(request)),
+                commitmentPolicy_
+        );
+
+        final int outSizeEstimate = cryptoHandler.estimateOutputSize(plaintext.length);
+        final byte[] out = new byte[outSizeEstimate];
+        int outLen = cryptoHandler.processBytes(plaintext, 0, plaintext.length, out, 0).getBytesWritten();
+        outLen += cryptoHandler.doFinal(out, outLen);
+
+        final byte[] outBytes = Utils.truncate(out, outLen);
+
+        //noinspection unchecked
+        return new CryptoResult(outBytes, cryptoHandler.getMasterKeys(), cryptoHandler.getHeaders());
+>>>>>>> master
     }
 
     /**
@@ -524,6 +645,7 @@ public class AwsCrypto {
                         .parsedCiphertext(ciphertext).build()).toCryptoResult();
     }
 
+<<<<<<< HEAD
     /**
      * Decrypts the provided {@link ParsedCiphertext} using the {@link CryptoMaterialsManager} or the {@link Keyring}
      * specified in the {@link DecryptRequest}.
@@ -533,6 +655,9 @@ public class AwsCrypto {
      */
     public AwsCryptoResult<byte[]> decrypt(final DecryptRequest request) {
         requireNonNull(request, "request is required");
+=======
+        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(materialsManager, ciphertext, commitmentPolicy_);
+>>>>>>> master
 
         final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(
                 request.cryptoMaterialsManager(), request.parsedCiphertext());
@@ -835,7 +960,7 @@ public class AwsCrypto {
     @Deprecated
     public <K extends MasterKey<K>> CryptoOutputStream<K> createDecryptingStream(
             final MasterKeyProvider<K> provider, final OutputStream os) {
-        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(provider);
+        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(provider, commitmentPolicy_);
         return new CryptoOutputStream<K>(os, cryptoHandler);
     }
 
@@ -852,7 +977,7 @@ public class AwsCrypto {
     @Deprecated
     public <K extends MasterKey<K>> CryptoInputStream<K> createDecryptingStream(
             final MasterKeyProvider<K> provider, final InputStream is) {
-        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(provider);
+        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(provider, commitmentPolicy_);
         return new CryptoInputStream<K>(is, cryptoHandler);
     }
 
@@ -869,6 +994,7 @@ public class AwsCrypto {
     public CryptoOutputStream<?> createDecryptingStream(
             final CryptoMaterialsManager materialsManager, final OutputStream os
     ) {
+<<<<<<< HEAD
         return createDecryptingOutputStream(CreateDecryptingOutputStreamRequest.builder()
                 .cryptoMaterialsManager(materialsManager)
                 .outputStream(os).build()).toCryptoOutputStream();
@@ -900,6 +1026,10 @@ public class AwsCrypto {
      */
     public AwsCryptoOutputStream createDecryptingOutputStream(final Consumer<CreateDecryptingOutputStreamRequest.Builder> request) {
         return createDecryptingOutputStream(CreateDecryptingOutputStreamRequest.builder().applyMutation(request).build());
+=======
+        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(materialsManager, commitmentPolicy_);
+        return new CryptoOutputStream(os, cryptoHandler);
+>>>>>>> master
     }
 
     /**
@@ -915,6 +1045,7 @@ public class AwsCrypto {
     public CryptoInputStream<?> createDecryptingStream(
             final CryptoMaterialsManager materialsManager, final InputStream is
     ) {
+<<<<<<< HEAD
         return createDecryptingInputStream(CreateDecryptingInputStreamRequest.builder()
                         .cryptoMaterialsManager(materialsManager)
                         .inputStream(is).build()).toCryptoInputStream();
@@ -947,6 +1078,10 @@ public class AwsCrypto {
      */
     public AwsCryptoInputStream createDecryptingInputStream(final Consumer<CreateDecryptingInputStreamRequest.Builder> request) {
         return createDecryptingInputStream(CreateDecryptingInputStreamRequest.builder().applyMutation(request).build());
+=======
+        final MessageCryptoHandler cryptoHandler = DecryptionHandler.create(materialsManager, commitmentPolicy_);
+        return new CryptoInputStream(is, cryptoHandler);
+>>>>>>> master
     }
 
     private MessageCryptoHandler getEncryptingStreamHandler(
@@ -957,7 +1092,8 @@ public class AwsCrypto {
 
         EncryptionMaterialsRequest.Builder requestBuilder = EncryptionMaterialsRequest.newBuilder()
                                                                                       .setContext(encryptionContext)
-                                                                                      .setRequestedAlgorithm(getEncryptionAlgorithm());
+                                                                                      .setRequestedAlgorithm(getEncryptionAlgorithm())
+                                                                                      .setCommitmentPolicy(commitmentPolicy_);
 
         return new LazyMessageCryptoHandler(info -> {
             // Hopefully we know the input size now, so we can pass it along to the CMM.
@@ -967,7 +1103,8 @@ public class AwsCrypto {
 
             return new EncryptionHandler(
                     getEncryptionFrameSize(),
-                    checkAlgorithm(materialsManager.getMaterialsForEncrypt(requestBuilder.build()))
+                    checkAlgorithm(materialsManager.getMaterialsForEncrypt(requestBuilder.build())),
+                    commitmentPolicy_
             );
         });
     }

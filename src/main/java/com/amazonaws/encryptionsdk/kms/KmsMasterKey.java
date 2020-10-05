@@ -47,6 +47,7 @@ public final class KmsMasterKey extends MasterKey<KmsMasterKey> implements KmsMe
     private final MasterKeyProvider<KmsMasterKey> sourceProvider_;
     private final String id_;
 
+<<<<<<< HEAD
     /**
      * @deprecated Use a {@link KmsMasterKeyProvider} to obtain {@link KmsMasterKey}s.
      */
@@ -63,6 +64,8 @@ public final class KmsMasterKey extends MasterKey<KmsMasterKey> implements KmsMe
         return new KmsMasterKeyProvider(creds, keyId).getMasterKey(keyId);
     }
 
+=======
+>>>>>>> master
     static KmsMasterKey getInstance(final Supplier<AWSKMS> kms, final String id,
                                     final MasterKeyProvider<KmsMasterKey> provider) {
         // Allow the user agent string to be appended (in order to match existing behavior)
@@ -133,6 +136,7 @@ public final class KmsMasterKey extends MasterKey<KmsMasterKey> implements KmsMe
         final List<Exception> exceptions = new ArrayList<>();
         for (final EncryptedDataKey edk : encryptedDataKeys) {
             try {
+<<<<<<< HEAD
                 final DataKeyEncryptionDao.DecryptDataKeyResult result = dataKeyEncryptionDao_.decryptDataKey(edk, algorithm, encryptionContext);
                 return new DataKey<>(
                     result.getPlaintextDataKey(),
@@ -140,6 +144,34 @@ public final class KmsMasterKey extends MasterKey<KmsMasterKey> implements KmsMe
                     edk.getProviderInformation(), this);
             } catch (final AwsCryptoException ex) {
                 exceptions.add(ex);
+=======
+                final String edkKeyId = new String(edk.getProviderInformation(), StandardCharsets.UTF_8);
+                if (!edkKeyId.equals(id_)) {
+                    continue;
+                }
+                final DecryptResult decryptResult = kms_.get().decrypt(updateUserAgent(
+                        new DecryptRequest()
+                                .withCiphertextBlob(ByteBuffer.wrap(edk.getEncryptedDataKey()))
+                                .withEncryptionContext(encryptionContext)
+                                .withGrantTokens(grantTokens_)
+                                .withKeyId(edkKeyId)));
+                if (decryptResult.getKeyId() == null) {
+                    throw new IllegalStateException("Received an empty keyId from KMS");
+                }
+                if (decryptResult.getKeyId().equals(id_)) {
+                    final byte[] rawKey = new byte[algorithm.getDataKeyLength()];
+                    decryptResult.getPlaintext().get(rawKey);
+                    if (decryptResult.getPlaintext().remaining() > 0) {
+                        throw new IllegalStateException("Received an unexpected number of bytes from KMS");
+                    }
+                    return new DataKey<>(
+                            new SecretKeySpec(rawKey, algorithm.getDataKeyAlgo()),
+                            edk.getEncryptedDataKey(),
+                            edk.getProviderInformation(), this);
+                }
+            } catch (final AmazonServiceException awsex) {
+                exceptions.add(awsex);
+>>>>>>> master
             }
         }
 

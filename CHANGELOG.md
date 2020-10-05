@@ -1,5 +1,6 @@
 # Changelog
 
+<<<<<<< HEAD
 ## 1.7.0 -- unreleased
 
 ### Deprecation Warnings
@@ -29,6 +30,22 @@ calls to `AwsCrypto.encrypt(EncryptRequest)` and `AwsCrypto.decrypt(DecryptReque
    [#165](https://github.com/aws/aws-encryption-sdk-java/pull/165),
    [#168](https://github.com/aws/aws-encryption-sdk-java/pull/168),
    and [#170](https://github.com/aws/aws-encryption-sdk-java/pull/170).
+=======
+## 2.0.0 -- 2020-09-24
+
+* feat!: Updates to the AWS Encryption SDK. d60db0b
+
+### BREAKING CHANGES
+
+* AWS KMS KeyIDs must be specified explicitly or Discovery mode explicitly chosen.
+Key committing suites are now default. CommitmentPolicy requires commitment by default.
+
+See: https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/migration.html
+
+## 1.7.0 -- 2020-09-24
+
+* feat: Updates to the AWS Encryption SDK. bdb31dc
+>>>>>>> master
 
 ## 1.6.2 -- 2020-05-26
 

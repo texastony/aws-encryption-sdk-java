@@ -55,9 +55,9 @@ class KmsMasterKeyTest {
         SecretKey secretKey = new SecretKeySpec(generate(ALGORITHM_SUITE.getDataKeyLength()), ALGORITHM_SUITE.getDataKeyAlgo());
 
         when(dataKeyEncryptionDao.decryptDataKey(encryptedDataKey1, ALGORITHM_SUITE, ENCRYPTION_CONTEXT))
-                .thenThrow(new MismatchedDataKeyException());
+            .thenThrow(new MismatchedDataKeyException());
         when(dataKeyEncryptionDao.decryptDataKey(encryptedDataKey2, ALGORITHM_SUITE, ENCRYPTION_CONTEXT))
-                .thenReturn(new DataKeyEncryptionDao.DecryptDataKeyResult("KeyId2", secretKey));
+            .thenReturn(new DataKeyEncryptionDao.DecryptDataKeyResult("KeyId2", secretKey));
 
         KmsMasterKey kmsMasterKey = new KmsMasterKey(dataKeyEncryptionDao, CMK_ARN, null);
 
@@ -69,5 +69,4 @@ class KmsMasterKeyTest {
 
         assertEquals(secretKey, result.getKey());
     }
-
 }

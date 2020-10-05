@@ -3,6 +3,7 @@
 
 package com.amazonaws.crypto.examples.keyring.awskms;
 
+import com.amazonaws.arn.Arn;
 import com.amazonaws.encryptionsdk.AwsCrypto;
 import com.amazonaws.encryptionsdk.AwsCryptoResult;
 import com.amazonaws.encryptionsdk.DecryptRequest;
@@ -23,12 +24,14 @@ import static java.util.stream.Collectors.toList;
 /**
  * You might have used master key providers to protect your data keys
  * in an earlier version of the AWS Encryption SDK.
- * This example shows how to configure a keyring that behaves like an AWS KMS master key provider.
+ * This example shows how to configure a keyring that behaves similarly to an AWS KMS master key provider.
  * <p>
  * The AWS Encryption SDK provided an AWS KMS master key provider for
  * interacting with AWS Key Management Service (AWS KMS).
- * On encrypt, the AWS KMS master key provider behaves like the AWS KMS keyring
+ *
+ * On encrypt, the AWS KMS master key provider behaves like the AWS KMS symmetric multi-CMK keyring
  * and encrypts with all CMKs that you identify.
+ *
  * However, on decrypt,
  * the AWS KMS master key provider reviews each encrypted data key (EDK).
  * If the EDK was encrypted under an AWS KMS CMK,
@@ -36,16 +39,27 @@ import static java.util.stream.Collectors.toList;
  * Whether decryption succeeds depends on permissions on the CMK.
  * This continues until the AWS KMS master key provider either runs out of EDKs
  * or succeeds in decrypting an EDK.
+ * In order to maintain a similar behavior,
+ * we use an AWS KMS symmetric multi-region keyring
+ * that has a list of regions it will attempt decryption in.
+ *
  * We have found that separating these two behaviors
  * makes the expected behavior clearer,
- * so that is what we did with the AWS KMS keyring and the AWS KMS discovery keyring.
+ * so that is what we did with the AWS KMS symmetric keyring and the AWS KMS region discovery keyring.
  * However, as you migrate from master key providers to keyrings,
- * you might want a keyring that behaves like the AWS KMS master key provider.
+ * you might want a keyring that behaves similarly the AWS KMS master key provider.
+ *
+ * The AWS KMS symmetric multi-region keyring throws an error on encryption,
+ * so it cannot be combined with an AWS KMS symmetric multi-CMK in a multi-keyring,
+ * if the encrypt operation is ever called.
+ * Therefore, we have two separate keyrings.
+ * One for encrypting with a specific list of CMKs
+ * and one for decrypting with a specific list of regions.
  * <p>
- * For more examples of how to use the AWS KMS keyring,
+ * For more examples of how to use the AWS KMS keyrings,
  * see the 'keyring/awskms' directory.
  */
-public class ActLikeAwsKmsMasterKeyProvider {
+public class ActSimilarToAwsKmsMasterKeyProvider {
 
     /**
      * Demonstrate how to create a keyring that behaves like an AWS KMS master key provider.
@@ -84,19 +98,45 @@ public class ActLikeAwsKmsMasterKeyProvider {
         //
         // This keyring reproduces the encryption behavior of the AWS KMS master key provider.
         //
-        // The AWS KMS keyring requires that you explicitly identify the CMK
+        // The AWS KMS symmetric multi-CMK keyring requires that you explicitly identify the CMK
         // that you want the keyring to use to generate the data key.
-        final Keyring cmkKeyring = StandardKeyrings.awsKmsBuilder()
-                .generatorKeyId(awsKmsCmk)
-                .keyIds(awsKmsAdditionalCmks)
+        final Keyring cmkKeyring = StandardKeyrings.awsKmsSymmetricMultiCmkBuilder()
+                .generator(awsKmsCmk)
+                .keyNames(awsKmsAdditionalCmks)
                 .build();
 
-        // Create an AWS KMS discovery keyring that will attempt to decrypt
-        // any data keys that were encrypted under an AWS KMS CMK.
-        final Keyring discoveryKeyring = StandardKeyrings.awsKmsDiscoveryBuilder().build();
+        // Create an AWS KMS symmetric multi-region discovery keyring that will attempt to decrypt
+        // any data keys that were encrypted under an AWS KMS CMK in a specific list of AWS regions.
+        //
+        // Please note that the multi-region discovery keyring requires the specific list of AWS regions
+        // it may communicate with.
+        //
+        // In production, if you need a keyring that attempts decryption in all AWS regions,
+        // you should call a service/API to get an updated list of AWS regions
+        // and configure the keyring with that list.
+        // Although there are ways of getting a list of AWS regions directly from the AWS SDK,
+        // this is more prone to staleness
+        // than making a service/API call.
+        //
+        // In most cases, you should simply call StandardKeyrings.awsKmsSymmetricMultiRegionDiscovery
+        // with the specific AWS regions you require for decryption
+        // and not attempt to configure the keyring with all available AWS regions.
+        // You should only provide the regions you need.
+        //
+        // This will provide flexibility for adding more regions over time,
+        // without allowing unnecessary access to regions that are not currently required.
+        final List<String> allRegionIds = new ArrayList<>();
+        allRegionIds.add(Arn.fromString(awsKmsCmk.toString()).getRegion());
+        for (final AwsKmsCmkId additionalKeyName : awsKmsAdditionalCmks) {
+            allRegionIds.add(Arn.fromString(additionalKeyName.toString()).getRegion());
+        }
+        final Keyring discoveryKeyring = StandardKeyrings.awsKmsSymmetricMultiRegionDiscovery(allRegionIds);
 
-        // Combine the CMK and discovery keyrings
-        // to create a keyring that behaves like an AWS KMS master key provider.
+        // Note that you cannot combine the AWS KMS symmetric multi-CMK and AWS KMS symmetric multi-region keyrings
+        // using a multi-keyring because the AWS KMS symmetric multi-region keyring throws an error
+        // when calling the encryption operation.
+        //
+        // Therefore, you should use these keyrings separately (one for encrypt and one for decrypt).
         //
         // The CMK keyring reproduces the encryption behavior
         // and the discovery keyring reproduces the decryption behavior.
@@ -105,13 +145,12 @@ public class ActLikeAwsKmsMasterKeyProvider {
         // it works on encrypt but fails to match any encrypted data keys on decrypt
         // because the serialized key name is the resulting CMK ARN rather than the alias name.
         // However, because the discovery keyring attempts to decrypt any AWS KMS-encrypted
-        // data keys that it finds, the message still decrypts successfully.
-        final Keyring keyring = StandardKeyrings.multi(cmkKeyring, discoveryKeyring);
+        // data keys that it finds, you are still able to successfully decrypt the message.
 
         // Encrypt your plaintext data.
         final AwsCryptoResult<byte[]> encryptResult = awsEncryptionSdk.encrypt(
                 EncryptRequest.builder()
-                        .keyring(keyring)
+                        .keyring(cmkKeyring)
                         .encryptionContext(encryptionContext)
                         .plaintext(sourcePlaintext).build());
         final byte[] ciphertext = encryptResult.getResult();
@@ -119,13 +158,13 @@ public class ActLikeAwsKmsMasterKeyProvider {
         // Demonstrate that the ciphertext and plaintext are different.
         assert !Arrays.equals(ciphertext, sourcePlaintext);
 
-        // Decrypt your encrypted data using the same keyring you used on encrypt.
+        // Decrypt your encrypted data using the AWS KMS symmetric multi-region keyring.
         //
         // You do not need to specify the encryption context on decrypt because
         // the header of the encrypted message includes the encryption context.
         final AwsCryptoResult<byte[]> decryptResult = awsEncryptionSdk.decrypt(
                 DecryptRequest.builder()
-                        .keyring(keyring)
+                        .keyring(discoveryKeyring)
                         .ciphertext(ciphertext).build());
         final byte[] decrypted = decryptResult.getResult();
 

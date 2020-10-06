@@ -25,12 +25,11 @@ import java.util.Map;
  * <p>
  * For examples of how to use the AWS KMS symmetric keyring
  * and the AWS KMS symmetric multi-CMK keyring with custom client configurations,
- * see the {@link CustomDataKeyEncryptionDao}
+ * see the {@link CustomCredentialProvider}
  * and {@link CustomKmsClientConfig} examples.
  * <p>
- * For examples of how to use the AWS KMS symmetric multi-region discovery keyring on decrypt,
- * see the {@link DiscoveryDecryptInRegionOnly}
- * and {@link DiscoveryDecryptWithPreferredRegions} examples.
+ * For examples of how to use the AWS KMS symmetric multi-region discovery keyring on decrypt
+ * see the {@link DiscoveryDecryptInRegionOnly} example.
  */
 public class SingleCmk {
 
@@ -42,7 +41,7 @@ public class SingleCmk {
      */
     public static void run(final AwsKmsCmkId awsKmsCmk, final byte[] sourcePlaintext) {
         // Instantiate the AWS Encryption SDK.
-        final AwsCrypto awsEncryptionSdk = new AwsCrypto();
+        final AwsCrypto awsEncryptionSdk = AwsCrypto.standard();
 
         // Prepare your encryption context.
         // Remember that your encryption context is NOT SECRET.

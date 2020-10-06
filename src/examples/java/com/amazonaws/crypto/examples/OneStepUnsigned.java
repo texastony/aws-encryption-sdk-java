@@ -46,8 +46,8 @@ public class OneStepUnsigned {
      */
     public static void run(final AwsKmsCmkId awsKmsCmk, final byte[] sourcePlaintext) {
         // Instantiate the AWS Encryption SDK and specify the algorithm suite that we want to use.
-        final AwsCrypto awsEncryptionSdk = new AwsCrypto();
-        awsEncryptionSdk.setEncryptionAlgorithm(CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256);
+        final AwsCrypto awsEncryptionSdk = AwsCrypto.standard();
+        awsEncryptionSdk.setEncryptionAlgorithm(CryptoAlgorithm.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY);
 
         // Prepare your encryption context.
         // Remember that your encryption context is NOT SECRET.

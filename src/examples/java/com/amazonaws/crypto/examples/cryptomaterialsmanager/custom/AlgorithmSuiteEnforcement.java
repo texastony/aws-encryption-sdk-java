@@ -3,7 +3,14 @@
 
 package com.amazonaws.crypto.examples.cryptomaterialsmanager.custom;
 
-import com.amazonaws.encryptionsdk.*;
+import com.amazonaws.encryptionsdk.AwsCrypto;
+import com.amazonaws.encryptionsdk.AwsCryptoResult;
+import com.amazonaws.encryptionsdk.CommitmentPolicy;
+import com.amazonaws.encryptionsdk.CryptoAlgorithm;
+import com.amazonaws.encryptionsdk.CryptoMaterialsManager;
+import com.amazonaws.encryptionsdk.DecryptRequest;
+import com.amazonaws.encryptionsdk.DefaultCryptoMaterialsManager;
+import com.amazonaws.encryptionsdk.EncryptRequest;
 import com.amazonaws.encryptionsdk.keyrings.Keyring;
 import com.amazonaws.encryptionsdk.keyrings.StandardKeyrings;
 import com.amazonaws.encryptionsdk.kms.AwsKmsCmkId;

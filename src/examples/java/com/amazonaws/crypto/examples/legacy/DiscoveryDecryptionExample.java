@@ -11,6 +11,7 @@ import java.util.Map;
 import com.amazonaws.encryptionsdk.AwsCrypto;
 import com.amazonaws.encryptionsdk.CryptoResult;
 import com.amazonaws.encryptionsdk.kms.AwsKmsCmkId;
+import com.amazonaws.encryptionsdk.kms.KMSTestFixtures;
 import com.amazonaws.encryptionsdk.kms.KmsMasterKey;
 import com.amazonaws.encryptionsdk.kms.KmsMasterKeyProvider;
 import com.amazonaws.encryptionsdk.CommitmentPolicy;
@@ -35,8 +36,8 @@ import com.amazonaws.encryptionsdk.kms.DiscoveryFilter;
  */
 public class DiscoveryDecryptionExample {
 
-    private static final String ACCOUNT_ID = "658956600833";
-    private static final String PARTITION = "aws";
+    private static final String ACCOUNT_ID = KMSTestFixtures.ACCOUNT_ID;
+    private static final String PARTITION = KMSTestFixtures.PARTITION;
     private static final byte[] EXAMPLE_DATA = "Hello World".getBytes(StandardCharsets.UTF_8);
 
     public static void run(final AwsKmsCmkId keyName) {

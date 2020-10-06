@@ -3,6 +3,7 @@
 
 package com.amazonaws.encryptionsdk.kms;
 
+import com.amazonaws.encryptionsdk.exception.MismatchedDataKeyException;
 import com.amazonaws.encryptionsdk.model.KeyBlob;
 import com.amazonaws.services.kms.AWSKMS;
 import com.amazonaws.RequestClientOptions;
@@ -23,6 +24,7 @@ import com.amazonaws.AmazonWebServiceRequest;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +35,10 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static com.amazonaws.encryptionsdk.EncryptedDataKey.PROVIDER_ENCODING;
 import static com.amazonaws.encryptionsdk.internal.RandomBytesGenerator.generate;
 import static com.amazonaws.encryptionsdk.TestUtils.assertThrows;
 import static org.junit.Assert.assertArrayEquals;
@@ -54,11 +58,41 @@ class KmsMasterKeyTest {
 
     private static final String AWS_KMS_PROVIDER_ID = "aws-kms";
     private static final String OTHER_PROVIDER_ID = "not-aws-kms";
+    private static final String CMK_ARN = "arn:aws:kms:us-east-1:999999999999:key/01234567-89ab-cdef-fedc-ba9876543210";
 
     private static final CryptoAlgorithm ALGORITHM_SUITE = CryptoAlgorithm.ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384;
     private static final SecretKey DATA_KEY = new SecretKeySpec(generate(ALGORITHM_SUITE.getDataKeyLength()), ALGORITHM_SUITE.getDataKeyAlgo());
     private static final List<String> GRANT_TOKENS = Collections.singletonList("testGrantToken");
     private static final Map<String, String> ENCRYPTION_CONTEXT = Collections.singletonMap("myKey", "myValue");
+
+    @Mock
+    AwsKmsDataKeyEncryptionDao dataKeyEncryptionDao;
+
+    /**
+     * Test that when decryption of an encrypted data key throws a MismatchedDataKeyException, this
+     * key is skipped and another key in the list of keys is decrypted.
+     */
+    @Test
+    void testMismatchedDataKeyException() {
+        EncryptedDataKey encryptedDataKey1 = new KeyBlob(AWS_KMS_PROVIDER_ID, CMK_ARN.getBytes(PROVIDER_ENCODING), generate(64));
+        EncryptedDataKey encryptedDataKey2 = new KeyBlob(AWS_KMS_PROVIDER_ID, CMK_ARN.getBytes(PROVIDER_ENCODING), generate(64));
+        SecretKey secretKey = new SecretKeySpec(generate(ALGORITHM_SUITE.getDataKeyLength()), ALGORITHM_SUITE.getDataKeyAlgo());
+
+        when(dataKeyEncryptionDao.decryptDataKey(encryptedDataKey1, ALGORITHM_SUITE, ENCRYPTION_CONTEXT))
+            .thenThrow(new MismatchedDataKeyException());
+        when(dataKeyEncryptionDao.decryptDataKey(encryptedDataKey2, ALGORITHM_SUITE, ENCRYPTION_CONTEXT))
+            .thenReturn(new DataKeyEncryptionDao.DecryptDataKeyResult(CMK_ARN, secretKey));
+
+        KmsMasterKey kmsMasterKey = new KmsMasterKey(dataKeyEncryptionDao, CMK_ARN, null);
+
+        List<EncryptedDataKey> encryptedDataKeys = new ArrayList<>();
+        encryptedDataKeys.add(encryptedDataKey1);
+        encryptedDataKeys.add(encryptedDataKey2);
+
+        DataKey<KmsMasterKey> result = kmsMasterKey.decryptDataKey(ALGORITHM_SUITE, encryptedDataKeys, ENCRYPTION_CONTEXT);
+
+        assertEquals(secretKey, result.getKey());
+    }
 
     @Test
     public void testEncryptAndDecrypt() {

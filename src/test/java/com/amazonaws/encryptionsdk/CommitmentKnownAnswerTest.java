@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 import com.amazonaws.encryptionsdk.model.DecryptionMaterials;
 import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
+import org.junit.jupiter.api.Tag;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -32,6 +33,7 @@ import com.amazonaws.encryptionsdk.internal.Utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 
+@Tag(TestUtils.TAG_INTEGRATION)
 @RunWith(Enclosed.class)
 public class CommitmentKnownAnswerTest {
 

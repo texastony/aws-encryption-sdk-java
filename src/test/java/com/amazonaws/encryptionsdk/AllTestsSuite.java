@@ -89,7 +89,8 @@ import com.amazonaws.encryptionsdk.kms.KmsMasterKeyTest;
         RestrictRegionExampleTest.class,
         SimpleDataKeyCachingExampleTest.class,
         SetEncryptionAlgorithmExampleTest.class,
-        SetCommitmentPolicyExampleTest.class
+        SetCommitmentPolicyExampleTest.class,
+        ParsedCiphertextTest.class,
 })
 public class AllTestsSuite {
 }

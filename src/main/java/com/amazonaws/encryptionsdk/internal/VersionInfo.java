@@ -26,7 +26,8 @@ public class VersionInfo {
   public static String loadUserAgent() {
     try {
       final Properties properties = new Properties();
-      properties.load(ClassLoader.getSystemResourceAsStream("project.properties"));
+      final ClassLoader loader = VersionInfo.class.getClassLoader();
+      properties.load(loader.getResourceAsStream("project.properties"));
       return USER_AGENT_PREFIX + properties.getProperty("version");
     } catch (final IOException ex) {
       return USER_AGENT_PREFIX + UNKNOWN_VERSION;

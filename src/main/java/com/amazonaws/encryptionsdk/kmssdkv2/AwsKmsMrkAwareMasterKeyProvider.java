@@ -1,31 +1,29 @@
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.amazonaws.encryptionsdk.kms;
+package com.amazonaws.encryptionsdk.kmssdkv2;
 
 import static com.amazonaws.encryptionsdk.internal.AwsKmsCmkArnInfo.*;
-import static com.amazonaws.encryptionsdk.internal.AwsKmsCmkArnInfo.parseInfoFromKeyArn;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
-import com.amazonaws.SdkClientException;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.encryptionsdk.*;
 import com.amazonaws.encryptionsdk.exception.AwsCryptoException;
 import com.amazonaws.encryptionsdk.exception.NoSuchMasterKeyException;
 import com.amazonaws.encryptionsdk.exception.UnsupportedProviderException;
 import com.amazonaws.encryptionsdk.internal.AwsKmsCmkArnInfo;
-import com.amazonaws.handlers.RequestHandler2;
-import com.amazonaws.services.kms.AWSKMS;
-import com.amazonaws.services.kms.AWSKMSClient;
-import com.amazonaws.services.kms.AWSKMSClientBuilder;
+import com.amazonaws.encryptionsdk.kms.DiscoveryFilter;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
+import software.amazon.awssdk.services.kms.KmsClient;
+import software.amazon.awssdk.services.kms.KmsClientBuilder;
 
 // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.5
 // # MUST implement the Master Key Provider Interface (../master-key-
@@ -43,18 +41,19 @@ public final class AwsKmsMrkAwareMasterKeyProvider
 
   private final boolean isDiscovery_;
   private final DiscoveryFilter discoveryFilter_;
-  private final String discoveryMrkRegion_;
+  private final Region discoveryMrkRegion_;
 
-  private final KmsMasterKeyProvider.RegionalClientSupplier regionalClientSupplier_;
-  private final String defaultRegion_;
+  private final RegionalClientSupplier regionalClientSupplier_;
+  private final Region defaultRegion_;
 
   public static class Builder implements Cloneable {
-    private String defaultRegion_ = getSdkDefaultRegion();
-    private Optional<KmsMasterKeyProvider.RegionalClientSupplier> regionalClientSupplier_ =
-        Optional.empty();
-    private AWSKMSClientBuilder templateBuilder_ = null;
+    private Region defaultRegion_ = getSdkDefaultRegion();
+
+    private Supplier<KmsClientBuilder> builderSupplier_ = null;
+    private RegionalClientSupplier regionalClientSupplier_ = null;
+
     private DiscoveryFilter discoveryFilter_ = null;
-    private String discoveryMrkRegion_ = this.defaultRegion_;
+    private Region discoveryMrkRegion_ = this.defaultRegion_;
 
     Builder() {
       // Default access: Don't allow outside classes to extend this class
@@ -62,12 +61,9 @@ public final class AwsKmsMrkAwareMasterKeyProvider
 
     public Builder clone() {
       try {
-        AwsKmsMrkAwareMasterKeyProvider.Builder cloned =
-            (AwsKmsMrkAwareMasterKeyProvider.Builder) super.clone();
+        Builder cloned = (Builder) super.clone();
 
-        if (templateBuilder_ != null) {
-          cloned.templateBuilder_ = cloneClientBuilder(templateBuilder_);
-        }
+        cloned.builderSupplier_ = builderSupplier_;
 
         return cloned;
       } catch (CloneNotSupportedException e) {
@@ -82,10 +78,10 @@ public final class AwsKmsMrkAwareMasterKeyProvider
      *
      * <p>If the default region is not specified, the AWS SDK default region will be used.
      *
-     * @see KmsMasterKeyProvider.Builder#withDefaultRegion(String)
+     * @see KmsMasterKeyProvider.Builder#defaultRegion(Region)
      * @param defaultRegion The default region to use.
      */
-    public AwsKmsMrkAwareMasterKeyProvider.Builder withDefaultRegion(String defaultRegion) {
+    public Builder defaultRegion(Region defaultRegion) {
       this.defaultRegion_ = defaultRegion;
       return this;
     }
@@ -99,8 +95,7 @@ public final class AwsKmsMrkAwareMasterKeyProvider
      *
      * @param discoveryMrkRegion The region to contact to attempt to decrypt multi-region keys.
      */
-    public AwsKmsMrkAwareMasterKeyProvider.Builder withDiscoveryMrkRegion(
-        String discoveryMrkRegion) {
+    public Builder discoveryMrkRegion(Region discoveryMrkRegion) {
       this.discoveryMrkRegion_ = discoveryMrkRegion;
       return this;
     }
@@ -111,77 +106,39 @@ public final class AwsKmsMrkAwareMasterKeyProvider
      *
      * <p>Because the regional client supplier fully controls the client construction process, it is
      * not possible to configure the client through methods such as {@link
-     * #withCredentials(AWSCredentialsProvider)} or {@link #withClientBuilder(AWSKMSClientBuilder)};
-     * if you try to use these in combination, an {@link IllegalStateException} will be thrown.
+     * #builderSupplier(Supplier)}; if you try to use these in combination, an {@link
+     * IllegalStateException} will be thrown.
      *
-     * @see
-     *     KmsMasterKeyProvider.Builder#withCustomClientFactory(KmsMasterKeyProvider.RegionalClientSupplier)
+     * @see KmsMasterKeyProvider.Builder#customRegionalClientSupplier(RegionalClientSupplier)
      */
-    public AwsKmsMrkAwareMasterKeyProvider.Builder withCustomClientFactory(
-        KmsMasterKeyProvider.RegionalClientSupplier regionalClientSupplier) {
-      if (templateBuilder_ != null) {
+    public Builder customRegionalClientSupplier(RegionalClientSupplier regionalClientSupplier) {
+      if (builderSupplier_ != null) {
         throw clientSupplierComboException();
       }
 
-      regionalClientSupplier_ = Optional.of(regionalClientSupplier);
+      regionalClientSupplier_ = regionalClientSupplier;
+      return this;
+    }
+
+    /**
+     * Configures the {@link AwsKmsMrkAwareMasterKeyProvider} to use settings from this {@link
+     * KmsClientBuilder} to configure KMS clients. Note that the region set on this builder will be
+     * ignored, but all other settings will be propagated into the regional clients.
+     *
+     * @see KmsMasterKeyProvider.Builder#builderSupplier(Supplier)
+     */
+    public Builder builderSupplier(Supplier<KmsClientBuilder> supplier) {
+      if (regionalClientSupplier_ != null) {
+        throw clientSupplierComboException();
+      }
+
+      this.builderSupplier_ = supplier;
       return this;
     }
 
     private RuntimeException clientSupplierComboException() {
       return new IllegalStateException(
-          "withCustomClientFactory cannot be used in conjunction with "
-              + "withCredentials or withClientBuilder");
-    }
-
-    /**
-     * Configures the {@link AwsKmsMrkAwareMasterKeyProvider} to use specific credentials. If a
-     * builder was previously set, this will override whatever credentials it set.
-     *
-     * @see KmsMasterKeyProvider.Builder#withCredentials(AWSCredentialsProvider)
-     */
-    public AwsKmsMrkAwareMasterKeyProvider.Builder withCredentials(
-        AWSCredentialsProvider credentialsProvider) {
-      if (regionalClientSupplier_.isPresent()) {
-        throw clientSupplierComboException();
-      }
-
-      if (templateBuilder_ == null) {
-        templateBuilder_ = AWSKMSClientBuilder.standard();
-      }
-
-      templateBuilder_.setCredentials(credentialsProvider);
-
-      return this;
-    }
-
-    /**
-     * Configures the {@link AwsKmsMrkAwareMasterKeyProvider} to use specific credentials. If a
-     * builder was previously set, this will override whatever credentials it set.
-     *
-     * @see KmsMasterKeyProvider.Builder#withCredentials(AWSCredentials)
-     */
-    public AwsKmsMrkAwareMasterKeyProvider.Builder withCredentials(AWSCredentials credentials) {
-      return withCredentials(new AWSStaticCredentialsProvider(credentials));
-    }
-
-    /**
-     * Configures the {@link AwsKmsMrkAwareMasterKeyProvider} to use settings from this {@link
-     * AWSKMSClientBuilder} to configure KMS clients. Note that the region set on this builder will
-     * be ignored, but all other settings will be propagated into the regional clients.
-     *
-     * <p>This method will overwrite any credentials set using {@link
-     * #withCredentials(AWSCredentialsProvider)}.
-     *
-     * @see KmsMasterKeyProvider.Builder#withClientBuilder(AWSKMSClientBuilder)
-     */
-    public AwsKmsMrkAwareMasterKeyProvider.Builder withClientBuilder(AWSKMSClientBuilder builder) {
-      if (regionalClientSupplier_.isPresent()) {
-        throw clientSupplierComboException();
-      }
-      final AWSKMSClientBuilder newBuilder = cloneClientBuilder(builder);
-      this.templateBuilder_ = newBuilder;
-
-      return this;
+          "only one of builderSupplier and customRegionalClientSupplier may be used");
     }
 
     /**
@@ -194,12 +151,16 @@ public final class AwsKmsMrkAwareMasterKeyProvider
     public AwsKmsMrkAwareMasterKeyProvider buildDiscovery() {
       final boolean isDiscovery = true;
 
+      // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.6
+      // # The regional client
+      // # supplier MUST be defined in discovery mode.
+      RegionalClientSupplier clientSupplier = regionalClientSupplier_;
+      if (clientSupplier == null) {
+        clientSupplier = clientFactory(new ConcurrentHashMap<>(), builderSupplier_);
+      }
+
       return new AwsKmsMrkAwareMasterKeyProvider(
-          // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.6
-          // # The regional client
-          // # supplier MUST be defined in discovery mode.
-          regionalClientSupplier_.orElse(
-              clientFactory(new ConcurrentHashMap<>(), templateBuilder_)),
+          clientSupplier,
           defaultRegion_,
           // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.6
           // # The key id list MUST be empty in discovery mode.
@@ -243,11 +204,15 @@ public final class AwsKmsMrkAwareMasterKeyProvider
     public AwsKmsMrkAwareMasterKeyProvider buildStrict(List<String> keyIds) {
       final boolean isDiscovery = false;
 
+      RegionalClientSupplier clientSupplier = regionalClientSupplier_;
+      if (clientSupplier == null) {
+        clientSupplier = clientFactory(new ConcurrentHashMap<>(), builderSupplier_);
+      }
+
       return new AwsKmsMrkAwareMasterKeyProvider(
-          regionalClientSupplier_.orElse(
-              clientFactory(new ConcurrentHashMap<>(), templateBuilder_)),
+          clientSupplier,
           defaultRegion_,
-          new ArrayList<String>(keyIds),
+          new ArrayList<>(keyIds),
           emptyList(),
           isDiscovery,
           // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.6
@@ -274,92 +239,62 @@ public final class AwsKmsMrkAwareMasterKeyProvider
       return buildStrict(asList(keyIds));
     }
 
-    static KmsMasterKeyProvider.RegionalClientSupplier clientFactory(
-        ConcurrentHashMap<String, AWSKMS> clientCache, AWSKMSClientBuilder templateBuilder) {
-
-      // Clone again; this MKP builder might be reused to build a second MKP with different creds.
-      AWSKMSClientBuilder builder =
-          templateBuilder != null
-              ? cloneClientBuilder(templateBuilder)
-              : AWSKMSClientBuilder.standard();
+    static RegionalClientSupplier clientFactory(
+        ConcurrentHashMap<Region, KmsClient> clientCache,
+        Supplier<KmsClientBuilder> builderSupplier) {
 
       return region -> {
+        /* Check for early return (Postcondition): If a client already exists, use that. */
         if (clientCache.containsKey(region)) {
           return clientCache.get(region);
         }
+
+        KmsClientBuilder builder =
+            builderSupplier != null ? builderSupplier.get() : KmsClient.builder();
 
         // We can't just use computeIfAbsent as we need to avoid leaking KMS clients if we're asked
         // to decrypt
         // an EDK with a bogus region in its ARN. So we'll install a request handler to identify the
         // first
         // successful call, and cache it when we see that.
-        final KmsMasterKeyProvider.SuccessfulRequestCacher cacher =
-            new KmsMasterKeyProvider.SuccessfulRequestCacher(clientCache, region);
-        final ArrayList<RequestHandler2> handlers = new ArrayList<>();
-        if (builder.getRequestHandlers() != null) {
-          handlers.addAll(builder.getRequestHandlers());
-        }
-        handlers.add(cacher);
-
-        final AWSKMS kms =
-            cloneClientBuilder(builder)
-                .withRegion(region)
-                .withRequestHandlers(handlers.toArray(new RequestHandler2[handlers.size()]))
+        final RequestClientCacher cacher = new RequestClientCacher(clientCache, region);
+        KmsClient client =
+            builder
+                .region(region)
+                .overrideConfiguration(config -> config.addExecutionInterceptor(cacher))
                 .build();
-        return cacher.setClient(kms);
+
+        return cacher.setClient(client);
       };
-    }
-
-    static AWSKMSClientBuilder cloneClientBuilder(final AWSKMSClientBuilder builder) {
-      // We need to copy all arguments out of the builder in case it's mutated later on.
-      // Unfortunately AWSKMSClientBuilder doesn't support .clone() so we'll have to do it by hand.
-
-      if (builder.getEndpoint() != null) {
-        // We won't be able to set the region later if a custom endpoint is set.
-        throw new IllegalArgumentException(
-            "Setting endpoint configuration is not compatible with passing a "
-                + "builder to the KmsMasterKeyProvider. Use withCustomClientFactory"
-                + " instead.");
-      }
-
-      final AWSKMSClientBuilder newBuilder = AWSKMSClient.builder();
-      newBuilder.setClientConfiguration(builder.getClientConfiguration());
-      newBuilder.setCredentials(builder.getCredentials());
-      newBuilder.setEndpointConfiguration(builder.getEndpoint());
-      newBuilder.setMetricsCollector(builder.getMetricsCollector());
-      if (builder.getRequestHandlers() != null) {
-        newBuilder.setRequestHandlers(builder.getRequestHandlers().toArray(new RequestHandler2[0]));
-      }
-      return newBuilder;
     }
 
     /**
      * The AWS SDK has a default process for evaluating the default Region. This returns null if no
      * default region is found. Because a default region _may_ not be needed.
      */
-    private static String getSdkDefaultRegion() {
+    private static Region getSdkDefaultRegion() {
       try {
-        return new com.amazonaws.regions.DefaultAwsRegionProviderChain().getRegion();
+        return new DefaultAwsRegionProviderChain().getRegion();
       } catch (SdkClientException ex) {
         return null;
       }
     }
   }
 
-  public static AwsKmsMrkAwareMasterKeyProvider.Builder builder() {
-    return new AwsKmsMrkAwareMasterKeyProvider.Builder();
+  public static Builder builder() {
+    return new Builder();
   }
 
   // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.6
   // # On initialization the caller MUST provide:
   private AwsKmsMrkAwareMasterKeyProvider(
-      KmsMasterKeyProvider.RegionalClientSupplier supplier,
-      String defaultRegion,
+      RegionalClientSupplier supplier,
+      Region defaultRegion,
       List<String> keyIds,
       List<String> grantTokens,
       boolean isDiscovery,
       DiscoveryFilter discoveryFilter,
-      String discoveryMrkRegion) {
+      Region discoveryMrkRegion) {
     // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.6
     // # The key id list MUST NOT be empty or null in strict mode.
     if (!isDiscovery && (keyIds == null || keyIds.isEmpty())) {
@@ -380,20 +315,22 @@ public final class AwsKmsMrkAwareMasterKeyProvider
     // # kms-mrk-are-unique.md#Implementation) and the function MUST return
     // # success.
     assertMrksAreUnique(keyIds);
+    /* Precondition: A region is required to contact AWS KMS.
+     * This is an edge case because the default region will be the same as the SDK default,
+     * but it is still possible.
+     */
     if (!isDiscovery
         && defaultRegion == null
-        && keyIds.stream()
-            .map(identifier -> parseInfoFromKeyArn(identifier))
-            .anyMatch(info -> info == null)) {
+        && keyIds.stream().map(AwsKmsCmkArnInfo::parseInfoFromKeyArn).anyMatch(Objects::isNull)) {
       throw new AwsCryptoException(
           "Can't use non-ARN key identifiers or aliases when " + "no default region is set");
     }
-    /* Precondition (untested): Discovery filter is only valid in discovery mode. */
+    /* Precondition: Discovery filter is only valid in discovery mode. */
     if (!isDiscovery && discoveryFilter != null) {
       throw new IllegalArgumentException(
           "Strict mode cannot be configured with a " + "discovery filter.");
     }
-    /* Precondition (untested): Discovery mode can not have any keys to filter. */
+    /* Precondition: Discovery mode can not have any keys to filter. */
     if (isDiscovery && !keyIds.isEmpty()) {
       throw new IllegalArgumentException("Discovery mode can not be configured with keys.");
     }
@@ -442,6 +379,16 @@ public final class AwsKmsMrkAwareMasterKeyProvider
             // # arn.md#identifying-an-aws-kms-multi-region-key) this function MUST
             // # exit successfully.
             //
+            /* Postcondition: Filter out duplicate resources that are not multi-region keys.
+             * I expect only have duplicates of specific multi-region keys.
+             * In JSON something like
+             * {
+             *      "mrk-edb7fe6942894d32ac46dbb1c922d574" : [
+             *          "arn:aws:kms:us-west-2:111122223333:key/mrk-edb7fe6942894d32ac46dbb1c922d574",
+             *          "arn:aws:kms:us-east-2:111122223333:key/mrk-edb7fe6942894d32ac46dbb1c922d574"
+             *      ]
+             *  }
+             */
             .filter(maybeMrk -> isMRK(maybeMrk.getKey()))
             /* Flatten the duplicate identifiers into a single list. */
             .flatMap(mrkEntry -> mrkEntry.getValue().stream())
@@ -466,12 +413,35 @@ public final class AwsKmsMrkAwareMasterKeyProvider
    */
   static String getResourceForResourceTypeKey(String identifier) {
     final AwsKmsCmkArnInfo info = parseInfoFromKeyArn(identifier);
+    /* Check for early return (Postcondition): Non-ARNs may be raw resources.
+     * Raw aliases ('alias/my-key')
+     * or key ids ('mrk-edb7fe6942894d32ac46dbb1c922d574').
+     */
     if (info == null) return identifier;
 
+    /* Check for early return (Postcondition): Return the identifier for non-key resource types.
+     * I only care about duplicate multi-region *keys*.
+     * Any other resource type
+     * should get filtered out.
+     * I return the entire identifier
+     * on the off chance that
+     * a customer has created
+     * an alias with a name `mrk-*`.
+     * This way such an alias
+     * can never accidentally
+     * collided with an existing multi-region key
+     * or a duplicate alias.
+     */
     if (!info.getResourceType().equals("key")) {
       return identifier;
     }
 
+    /* Postcondition: Return the key id.
+     * This will be used
+     * to find different regional replicas of
+     * the same multi-region key
+     * because the key id for replicas is always the same.
+     */
     return info.getResource();
   }
 
@@ -521,6 +491,10 @@ public final class AwsKmsMrkAwareMasterKeyProvider
     // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.7
     // # In discovery mode, the requested
     // # AWS KMS key identifier MUST be a well formed AWS KMS ARN.
+    /* Precondition: Discovery mode requires requestedKeyArn be an ARN.
+     * This function is called on the encrypt path.
+     * It _may_ be the case that a raw key id, for example, was configured.
+     */
     if (isDiscovery_ && requestedKeyArnInfo == null) {
       throw new NoSuchMasterKeyException(
           "Cannot use AWS KMS identifiers " + "when in discovery mode.");
@@ -543,7 +517,7 @@ public final class AwsKmsMrkAwareMasterKeyProvider
               + " with configured discovery filter.");
     }
 
-    final String regionName_ =
+    final Region region_ =
         extractRegion(
             defaultRegion_, discoveryMrkRegion_, matchedArn, requestedKeyArnInfo, isDiscovery_);
 
@@ -551,21 +525,21 @@ public final class AwsKmsMrkAwareMasterKeyProvider
     // # An AWS KMS client
     // # MUST be obtained by calling the regional client supplier with this
     // # AWS Region.
-    AWSKMS kms = regionalClientSupplier_.getClient(regionName_);
+    KmsClient client = regionalClientSupplier_.getClient(region_);
 
     String keyIdentifier =
         isDiscovery_
             // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.7
             // # In discovery mode a AWS KMS MRK Aware Master Key (aws-kms-mrk-aware-
             // # master-key.md) MUST be returned configured with
-            ? requestedKeyArnInfo.toString(regionName_)
+            ? requestedKeyArnInfo.toString(region_.id())
             // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.7
             // # In strict mode a AWS KMS MRK Aware Master Key (aws-kms-mrk-aware-
             // # master-key.md) MUST be returned configured with
             : matchedArn.get();
 
     final AwsKmsMrkAwareMasterKey result =
-        AwsKmsMrkAwareMasterKey.getInstance(kms, keyIdentifier, this);
+        AwsKmsMrkAwareMasterKey.getInstance(client, keyIdentifier, this);
     result.setGrantTokens(grantTokens_);
     // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.7
     // # The output MUST be the same as the Master Key Provider Get Master Key
@@ -579,9 +553,9 @@ public final class AwsKmsMrkAwareMasterKeyProvider
    *
    * <p>Refactored into a pure function to facilitate testing and ensure correctness.
    */
-  static String extractRegion(
-      final String defaultRegion,
-      final String discoveryMrkRegion,
+  static Region extractRegion(
+      final Region defaultRegion,
+      final Region discoveryMrkRegion,
       final Optional<String> matchedArn,
       final AwsKmsCmkArnInfo requestedKeyArnInfo,
       final boolean isDiscovery) {
@@ -598,7 +572,7 @@ public final class AwsKmsMrkAwareMasterKeyProvider
     // # from the encrypted data key.
     if (!isMRK(requestedKeyArnInfo.getResource())
         || !requestedKeyArnInfo.getResourceType().equals("key")) {
-      return requestedKeyArnInfo.getRegion();
+      return Region.of(requestedKeyArnInfo.getRegion());
     }
     // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.7
     // # Otherwise if the mode is discovery then
@@ -611,7 +585,7 @@ public final class AwsKmsMrkAwareMasterKeyProvider
     // # be the region from the AWS KMS key in the configured key ids matched
     // # to the requested AWS KMS key by using AWS KMS MRK Match for Decrypt
     // # (aws-kms-mrk-match-for-decrypt.md#implementation).
-    return parseInfoFromKeyArn(matchedArn.get()).getRegion();
+    return Region.of(parseInfoFromKeyArn(matchedArn.get()).getRegion());
   }
 
   // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key-provider.txt#2.8

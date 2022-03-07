@@ -6,8 +6,8 @@ package com.amazonaws.crypto.examples;
 import com.amazonaws.encryptionsdk.AwsCrypto;
 import com.amazonaws.encryptionsdk.CommitmentPolicy;
 import com.amazonaws.encryptionsdk.CryptoResult;
-import com.amazonaws.encryptionsdk.kms.AwsKmsMrkAwareMasterKey;
-import com.amazonaws.encryptionsdk.kms.AwsKmsMrkAwareMasterKeyProvider;
+import com.amazonaws.encryptionsdk.kmssdkv2.AwsKmsMrkAwareMasterKey;
+import com.amazonaws.encryptionsdk.kmssdkv2.AwsKmsMrkAwareMasterKeyProvider;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;

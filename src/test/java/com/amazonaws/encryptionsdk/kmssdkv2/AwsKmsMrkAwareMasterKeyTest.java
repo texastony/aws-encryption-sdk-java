@@ -1,24 +1,16 @@
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.amazonaws.encryptionsdk.kms;
+package com.amazonaws.encryptionsdk.kmssdkv2;
 
 import static com.amazonaws.encryptionsdk.internal.RandomBytesGenerator.generate;
 import static org.junit.Assert.*;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.mock;
 
-import com.amazonaws.AmazonServiceException;
-import com.amazonaws.RequestClientOptions;
 import com.amazonaws.encryptionsdk.*;
 import com.amazonaws.encryptionsdk.exception.CannotUnwrapDataKeyException;
-import com.amazonaws.encryptionsdk.internal.VersionInfo;
 import com.amazonaws.encryptionsdk.model.KeyBlob;
-import com.amazonaws.services.kms.AWSKMS;
-import com.amazonaws.services.kms.model.*;
 import java.lang.reflect.Method;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,8 +20,13 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
+import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.services.kms.KmsClient;
+import software.amazon.awssdk.services.kms.model.*;
 
 @RunWith(Enclosed.class)
 public class AwsKmsMrkAwareMasterKeyTest {
@@ -38,7 +35,7 @@ public class AwsKmsMrkAwareMasterKeyTest {
 
     @Test
     public void basic_use() {
-      AWSKMS client = spy(new MockKMSClient());
+      KmsClient client = spy(new MockKmsClient());
       MasterKeyProvider mkp = mock(MasterKeyProvider.class);
 
       // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key.txt#2.6
@@ -62,7 +59,7 @@ public class AwsKmsMrkAwareMasterKeyTest {
     // = type=test
     // # The AWS KMS key identifier MUST NOT be null or empty.
     public void requires_valid_identifiers() {
-      AWSKMS client = spy(new MockKMSClient());
+      KmsClient client = spy(new MockKmsClient());
       MasterKeyProvider mkp = mock(MasterKeyProvider.class);
 
       assertThrows(
@@ -101,8 +98,9 @@ public class AwsKmsMrkAwareMasterKeyTest {
     }
 
     @Test
+    @DisplayName("Precondition: A provider is required.")
     public void requires_valid_provider() {
-      AWSKMS client = spy(new MockKMSClient());
+      KmsClient client = spy(new MockKmsClient());
 
       assertThrows(
           IllegalArgumentException.class,
@@ -124,16 +122,15 @@ public class AwsKmsMrkAwareMasterKeyTest {
       final Map<String, String> ENCRYPTION_CONTEXT = Collections.singletonMap("myKey", "myValue");
       final String keyIdentifier =
           "arn:aws:kms:us-west-2:658956600833:key/b3537ef1-d8dc-4780-9f5a-55776cbb2f7f";
-      final ByteBuffer udk = ByteBuffer.allocate(ALGORITHM_SUITE.getDataKeyLength());
-      final ByteBuffer ciphertext = ByteBuffer.allocate(10);
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.generateDataKey(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.generateDataKey((GenerateDataKeyRequest) any()))
           .thenReturn(
-              new GenerateDataKeyResult()
-                  .withPlaintext(udk)
-                  .withKeyId(keyIdentifier)
-                  .withCiphertextBlob(ciphertext));
+              GenerateDataKeyResponse.builder()
+                  .plaintext(SdkBytes.fromByteArray(new byte[ALGORITHM_SUITE.getDataKeyLength()]))
+                  .keyId(keyIdentifier)
+                  .ciphertextBlob(SdkBytes.fromByteArray(new byte[10]))
+                  .build());
       final MasterKeyProvider mkp = mock(MasterKeyProvider.class);
       when(mkp.getDefaultProviderId()).thenReturn("aws-kms");
       AwsKmsMrkAwareMasterKey masterKey =
@@ -168,16 +165,17 @@ public class AwsKmsMrkAwareMasterKeyTest {
 
       GenerateDataKeyRequest actualRequest = gr.getValue();
 
-      assertEquals(keyIdentifier, actualRequest.getKeyId());
-      assertEquals(GRANT_TOKENS, actualRequest.getGrantTokens());
-      assertEquals(ENCRYPTION_CONTEXT, actualRequest.getEncryptionContext());
-      assertEquals(
-          ALGORITHM_SUITE.getDataKeyLength(), actualRequest.getNumberOfBytes().longValue());
+      assertEquals(keyIdentifier, actualRequest.keyId());
+      assertEquals(GRANT_TOKENS, actualRequest.grantTokens());
+      assertEquals(ENCRYPTION_CONTEXT, actualRequest.encryptionContext());
+      assertEquals(ALGORITHM_SUITE.getDataKeyLength(), actualRequest.numberOfBytes().longValue());
+      assertTrue(actualRequest.overrideConfiguration().isPresent());
       assertTrue(
           actualRequest
-              .getRequestClientOptions()
-              .getClientMarker(RequestClientOptions.Marker.USER_AGENT)
-              .contains(VersionInfo.loadUserAgent()));
+              .overrideConfiguration()
+              .get()
+              .apiNames()
+              .contains(AwsKmsMrkAwareMasterKey.API_NAME));
 
       assertNotNull(test.getKey());
       // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key.txt#2.10
@@ -210,13 +208,14 @@ public class AwsKmsMrkAwareMasterKeyTest {
       // fail
       final int wrongLength = ALGORITHM_SUITE.getDataKeyLength() + 1;
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.generateDataKey(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.generateDataKey((GenerateDataKeyRequest) any()))
           .thenReturn(
-              new GenerateDataKeyResult()
-                  .withPlaintext(ByteBuffer.allocate(wrongLength))
-                  .withKeyId(keyIdentifier)
-                  .withCiphertextBlob(ByteBuffer.allocate(10)));
+              GenerateDataKeyResponse.builder()
+                  .plaintext(SdkBytes.fromByteArray(new byte[wrongLength]))
+                  .keyId(keyIdentifier)
+                  .ciphertextBlob(SdkBytes.fromByteArray(new byte[10]))
+                  .build());
       final MasterKeyProvider mkp = mock(MasterKeyProvider.class);
       when(mkp.getDefaultProviderId()).thenReturn("aws-kms");
       AwsKmsMrkAwareMasterKey masterKey =
@@ -228,6 +227,8 @@ public class AwsKmsMrkAwareMasterKeyTest {
     }
 
     @Test
+    @DisplayName(
+        "Exceptional Postcondition: Must have an AWS KMS ARN from AWS KMS generateDataKey.")
     public void need_an_arn() {
       final CryptoAlgorithm ALGORITHM_SUITE =
           CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
@@ -235,17 +236,18 @@ public class AwsKmsMrkAwareMasterKeyTest {
       final String keyIdentifier =
           "arn:aws:kms:us-west-2:658956600833:key/b3537ef1-d8dc-4780-9f5a-55776cbb2f7f";
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.generateDataKey(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.generateDataKey((GenerateDataKeyRequest) any()))
           .thenReturn(
-              new GenerateDataKeyResult()
-                  .withPlaintext(ByteBuffer.allocate(ALGORITHM_SUITE.getDataKeyLength()))
+              GenerateDataKeyResponse.builder()
+                  .plaintext(SdkBytes.fromByteArray(new byte[ALGORITHM_SUITE.getDataKeyLength()]))
                   // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key.txt#2.10
                   // = type=test
                   // # The response's "KeyId"
                   // # MUST be valid.
-                  .withKeyId("b3537ef1-d8dc-4780-9f5a-55776cbb2f7f")
-                  .withCiphertextBlob(ByteBuffer.allocate(10)));
+                  .keyId("b3537ef1-d8dc-4780-9f5a-55776cbb2f7f")
+                  .ciphertextBlob(SdkBytes.fromByteArray(new byte[10]))
+                  .build());
       final MasterKeyProvider mkp = mock(MasterKeyProvider.class);
       when(mkp.getDefaultProviderId()).thenReturn("aws-kms");
       AwsKmsMrkAwareMasterKey masterKey =
@@ -280,12 +282,13 @@ public class AwsKmsMrkAwareMasterKeyTest {
               "aws-kms".getBytes(StandardCharsets.UTF_8),
               mock(MasterKey.class));
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.encrypt(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.encrypt((EncryptRequest) any()))
           .thenReturn(
-              new EncryptResult()
-                  .withKeyId(keyIdentifier)
-                  .withCiphertextBlob(ByteBuffer.allocate(10)));
+              EncryptResponse.builder()
+                  .keyId(keyIdentifier)
+                  .ciphertextBlob(SdkBytes.fromByteArray(new byte[10]))
+                  .build());
 
       AwsKmsMrkAwareMasterKey masterKey =
           AwsKmsMrkAwareMasterKey.getInstance(client, keyIdentifier, mkp);
@@ -310,20 +313,22 @@ public class AwsKmsMrkAwareMasterKeyTest {
       // # key MUST use the configured AWS KMS client to make an AWS KMS Encrypt
       // # (https://docs.aws.amazon.com/kms/latest/APIReference/
       // # API_Encrypt.html) request constructed as follows:
-      verify(client, times(1)).encrypt(any());
+      verify(client, times(1)).encrypt((EncryptRequest) any());
       ArgumentCaptor<EncryptRequest> gr = ArgumentCaptor.forClass(EncryptRequest.class);
       verify(client, times(1)).encrypt(gr.capture());
 
       final EncryptRequest actualRequest = gr.getValue();
 
-      assertEquals(keyIdentifier, actualRequest.getKeyId());
-      assertEquals(GRANT_TOKENS, actualRequest.getGrantTokens());
-      assertEquals(ENCRYPTION_CONTEXT, actualRequest.getEncryptionContext());
+      assertEquals(keyIdentifier, actualRequest.keyId());
+      assertEquals(GRANT_TOKENS, actualRequest.grantTokens());
+      assertEquals(ENCRYPTION_CONTEXT, actualRequest.encryptionContext());
+      assertTrue(actualRequest.overrideConfiguration().isPresent());
       assertTrue(
           actualRequest
-              .getRequestClientOptions()
-              .getClientMarker(RequestClientOptions.Marker.USER_AGENT)
-              .contains(VersionInfo.loadUserAgent()));
+              .overrideConfiguration()
+              .get()
+              .apiNames()
+              .contains(AwsKmsMrkAwareMasterKey.API_NAME));
 
       assertNotNull(test.getKey());
       assertEquals(ALGORITHM_SUITE.getDataKeyLength(), test.getKey().getEncoded().length);
@@ -338,6 +343,7 @@ public class AwsKmsMrkAwareMasterKeyTest {
     }
 
     @Test
+    @DisplayName("Precondition: The key format MUST be RAW.")
     public void secret_key_must_be_raw() {
       final CryptoAlgorithm ALGORITHM_SUITE =
           CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
@@ -359,12 +365,13 @@ public class AwsKmsMrkAwareMasterKeyTest {
               "aws-kms".getBytes(StandardCharsets.UTF_8),
               mock(MasterKey.class));
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.encrypt(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.encrypt((EncryptRequest) any()))
           .thenReturn(
-              new EncryptResult()
-                  .withKeyId(keyIdentifier)
-                  .withCiphertextBlob(ByteBuffer.allocate(10)));
+              EncryptResponse.builder()
+                  .keyId(keyIdentifier)
+                  .ciphertextBlob(SdkBytes.fromByteArray(new byte[10]))
+                  .build());
 
       AwsKmsMrkAwareMasterKey masterKey =
           AwsKmsMrkAwareMasterKey.getInstance(client, keyIdentifier, mkp);
@@ -377,6 +384,7 @@ public class AwsKmsMrkAwareMasterKeyTest {
     }
 
     @Test
+    @DisplayName("Postcondition: Must have an AWS KMS ARN from AWS KMS encrypt.")
     public void need_an_arn() {
       final CryptoAlgorithm ALGORITHM_SUITE =
           CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
@@ -398,15 +406,16 @@ public class AwsKmsMrkAwareMasterKeyTest {
               "aws-kms".getBytes(StandardCharsets.UTF_8),
               mock(MasterKey.class));
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.encrypt(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.encrypt((EncryptRequest) any()))
           .thenReturn(
-              new EncryptResult()
+              EncryptResponse.builder()
                   // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key.txt#2.11
                   // = type=test
                   // # The AWS KMS Encrypt response MUST contain a valid "KeyId".
-                  .withKeyId("b3537ef1-d8dc-4780-9f5a-55776cbb2f7f")
-                  .withCiphertextBlob(ByteBuffer.allocate(10)));
+                  .keyId("b3537ef1-d8dc-4780-9f5a-55776cbb2f7f")
+                  .ciphertextBlob(SdkBytes.fromByteArray(new byte[10]))
+                  .build());
 
       AwsKmsMrkAwareMasterKey masterKey =
           AwsKmsMrkAwareMasterKey.getInstance(client, keyIdentifier, mkp);
@@ -525,12 +534,13 @@ public class AwsKmsMrkAwareMasterKeyTest {
       final MasterKeyProvider mkp = mock(MasterKeyProvider.class);
       when(mkp.getDefaultProviderId()).thenReturn(providerId);
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.decrypt(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.decrypt((DecryptRequest) any()))
           .thenReturn(
-              new DecryptResult()
-                  .withKeyId(keyIdentifier)
-                  .withPlaintext(ByteBuffer.allocate(ALGORITHM_SUITE.getDataKeyLength())));
+              DecryptResponse.builder()
+                  .keyId(keyIdentifier)
+                  .plaintext(SdkBytes.fromByteArray(new byte[ALGORITHM_SUITE.getDataKeyLength()]))
+                  .build());
 
       AwsKmsMrkAwareMasterKey masterKey =
           AwsKmsMrkAwareMasterKey.getInstance(client, keyIdentifier, mkp);
@@ -540,7 +550,7 @@ public class AwsKmsMrkAwareMasterKeyTest {
           AwsKmsMrkAwareMasterKey.decryptSingleEncryptedDataKey(
               any(), client, keyIdentifier, GRANT_TOKENS, ALGORITHM_SUITE, edk, ENCRYPTION_CONTEXT);
 
-      verify(client, times(1)).decrypt(any());
+      verify(client, times(1)).decrypt((DecryptRequest) any());
       ArgumentCaptor<DecryptRequest> gr = ArgumentCaptor.forClass(DecryptRequest.class);
       verify(client, times(1)).decrypt(gr.capture());
 
@@ -552,14 +562,16 @@ public class AwsKmsMrkAwareMasterKeyTest {
       // # configured AWS KMS client to make an AWS KMS Decrypt
       // # (https://docs.aws.amazon.com/kms/latest/APIReference/
       // # API_Decrypt.html) request constructed as follows:
-      assertEquals(keyIdentifier, actualRequest.getKeyId());
-      assertEquals(GRANT_TOKENS, actualRequest.getGrantTokens());
-      assertEquals(ENCRYPTION_CONTEXT, actualRequest.getEncryptionContext());
+      assertEquals(keyIdentifier, actualRequest.keyId());
+      assertEquals(GRANT_TOKENS, actualRequest.grantTokens());
+      assertEquals(ENCRYPTION_CONTEXT, actualRequest.encryptionContext());
+      assertTrue(actualRequest.overrideConfiguration().isPresent());
       assertTrue(
           actualRequest
-              .getRequestClientOptions()
-              .getClientMarker(RequestClientOptions.Marker.USER_AGENT)
-              .contains(VersionInfo.loadUserAgent()));
+              .overrideConfiguration()
+              .get()
+              .apiNames()
+              .contains(AwsKmsMrkAwareMasterKey.API_NAME));
 
       assertNotNull(test.getKey());
       assertEquals(ALGORITHM_SUITE.getDataKeyLength(), test.getKey().getEncoded().length);
@@ -567,6 +579,7 @@ public class AwsKmsMrkAwareMasterKeyTest {
     }
 
     @Test
+    @DisplayName("Exceptional Postcondition: Must have a CMK ARN from AWS KMS to match.")
     public void expect_key_arn() {
       final CryptoAlgorithm ALGORITHM_SUITE =
           CryptoAlgorithm.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
@@ -581,12 +594,13 @@ public class AwsKmsMrkAwareMasterKeyTest {
       final MasterKeyProvider mkp = mock(MasterKeyProvider.class);
       when(mkp.getDefaultProviderId()).thenReturn(providerId);
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.decrypt(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.decrypt((DecryptRequest) any()))
           .thenReturn(
-              new DecryptResult()
-                  .withKeyId(null)
-                  .withPlaintext(ByteBuffer.allocate(ALGORITHM_SUITE.getDataKeyLength())));
+              DecryptResponse.builder()
+                  .keyId(null)
+                  .plaintext(SdkBytes.fromByteArray(new byte[ALGORITHM_SUITE.getDataKeyLength()]))
+                  .build());
 
       AwsKmsMrkAwareMasterKey masterKey =
           AwsKmsMrkAwareMasterKey.getInstance(client, keyIdentifier, mkp);
@@ -625,12 +639,13 @@ public class AwsKmsMrkAwareMasterKeyTest {
       final MasterKeyProvider mkp = mock(MasterKeyProvider.class);
       when(mkp.getDefaultProviderId()).thenReturn(providerId);
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.decrypt(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.decrypt((DecryptRequest) any()))
           .thenReturn(
-              new DecryptResult()
-                  .withKeyId("arn:aws:kms:us-west-2:658956600833:key/something-else")
-                  .withPlaintext(ByteBuffer.allocate(ALGORITHM_SUITE.getDataKeyLength())));
+              DecryptResponse.builder()
+                  .keyId("arn:aws:kms:us-west-2:658956600833:key/something-else")
+                  .plaintext(SdkBytes.fromByteArray(new byte[ALGORITHM_SUITE.getDataKeyLength()]))
+                  .build());
 
       AwsKmsMrkAwareMasterKey masterKey =
           AwsKmsMrkAwareMasterKey.getInstance(client, keyIdentifier, mkp);
@@ -672,12 +687,13 @@ public class AwsKmsMrkAwareMasterKeyTest {
       final MasterKeyProvider mkp = mock(MasterKeyProvider.class);
       when(mkp.getDefaultProviderId()).thenReturn(providerId);
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.decrypt(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.decrypt((DecryptRequest) any()))
           .thenReturn(
-              new DecryptResult()
-                  .withKeyId(keyIdentifier)
-                  .withPlaintext(ByteBuffer.allocate(wrongLength)));
+              DecryptResponse.builder()
+                  .keyId(keyIdentifier)
+                  .plaintext(SdkBytes.fromByteArray(new byte[wrongLength]))
+                  .build());
 
       AwsKmsMrkAwareMasterKey masterKey =
           AwsKmsMrkAwareMasterKey.getInstance(client, keyIdentifier, mkp);
@@ -717,12 +733,13 @@ public class AwsKmsMrkAwareMasterKeyTest {
       final EncryptedDataKey edk2 =
           new KeyBlob("aws-kms", keyIdentifier.getBytes(StandardCharsets.UTF_8), cipherText);
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.decrypt(any()))
+      final KmsClient client = mock(KmsClient.class);
+      when(client.decrypt((DecryptRequest) any()))
           .thenReturn(
-              new DecryptResult()
-                  .withKeyId(keyIdentifier)
-                  .withPlaintext(ByteBuffer.allocate(ALGORITHM_SUITE.getDataKeyLength())));
+              DecryptResponse.builder()
+                  .keyId(keyIdentifier)
+                  .plaintext(SdkBytes.fromByteArray(new byte[ALGORITHM_SUITE.getDataKeyLength()]))
+                  .build());
 
       final AwsKmsMrkAwareMasterKey mk =
           AwsKmsMrkAwareMasterKey.getInstance(client, keyIdentifier, mkp);
@@ -747,11 +764,14 @@ public class AwsKmsMrkAwareMasterKeyTest {
       // # encrypted data keys.
       verify(client, times((1)))
           .decrypt(
-              new DecryptRequest()
-                  .withGrantTokens(GRANT_TOKENS)
-                  .withEncryptionContext(ENCRYPTION_CONTEXT)
-                  .withKeyId(keyIdentifier)
-                  .withCiphertextBlob(ByteBuffer.wrap(cipherText)));
+              DecryptRequest.builder()
+                  .overrideConfiguration(
+                      builder -> builder.addApiName(AwsKmsMrkAwareMasterKey.API_NAME))
+                  .grantTokens(GRANT_TOKENS)
+                  .encryptionContext(ENCRYPTION_CONTEXT)
+                  .keyId(keyIdentifier)
+                  .ciphertextBlob(SdkBytes.fromByteArray(cipherText))
+                  .build());
 
       // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key.txt#2.9
       // = type=test
@@ -784,10 +804,10 @@ public class AwsKmsMrkAwareMasterKeyTest {
       final MasterKeyProvider mkp = mock(MasterKeyProvider.class);
       when(mkp.getDefaultProviderId()).thenReturn(providerId);
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.decrypt(any())).thenThrow(new AmazonServiceException(clientErrMsg));
-      final KmsMasterKeyProvider.RegionalClientSupplier supplier =
-          mock(KmsMasterKeyProvider.RegionalClientSupplier.class);
+      final KmsClient client = mock(KmsClient.class);
+      when(client.decrypt((DecryptRequest) any()))
+          .thenThrow(AwsServiceException.builder().message(clientErrMsg).build());
+      final RegionalClientSupplier supplier = mock(RegionalClientSupplier.class);
       when(supplier.getClient(any())).thenReturn(client);
 
       final AwsKmsMrkAwareMasterKey masterKey =
@@ -814,6 +834,7 @@ public class AwsKmsMrkAwareMasterKeyTest {
     }
 
     @Test
+    @DisplayName("Exceptional Postcondition: Master key was unable to decrypt.")
     // = compliance/framework/aws-kms/aws-kms-mrk-aware-master-key.txt#2.9
     // = type=test
     // # If this attempt
@@ -838,11 +859,11 @@ public class AwsKmsMrkAwareMasterKeyTest {
       final MasterKeyProvider mkp = mock(MasterKeyProvider.class);
       when(mkp.getDefaultProviderId()).thenReturn(providerId);
 
-      final AWSKMS client = mock(AWSKMS.class);
-      when(client.decrypt(any())).thenThrow(new AmazonServiceException(clientErrMsg));
+      final KmsClient client = mock(KmsClient.class);
+      when(client.decrypt((DecryptRequest) any()))
+          .thenThrow(AwsServiceException.builder().message(clientErrMsg).build());
 
-      KmsMasterKeyProvider.RegionalClientSupplier supplier =
-          mock(KmsMasterKeyProvider.RegionalClientSupplier.class);
+      RegionalClientSupplier supplier = mock(RegionalClientSupplier.class);
       when(supplier.getClient(any())).thenReturn(client);
 
       AwsKmsMrkAwareMasterKey masterKey =
@@ -859,7 +880,7 @@ public class AwsKmsMrkAwareMasterKeyTest {
                       ALGORITHM_SUITE, Arrays.asList(edk), ENCRYPTION_CONTEXT));
       assertEquals(1, test.getSuppressed().length);
       Throwable fromClient = Arrays.stream(test.getSuppressed()).findFirst().get();
-      assertTrue(fromClient instanceof AmazonServiceException);
+      assertTrue(fromClient instanceof AwsServiceException);
       assertTrue(fromClient.getMessage().startsWith(clientErrMsg));
     }
   }

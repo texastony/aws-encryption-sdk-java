@@ -14,9 +14,8 @@ import com.amazonaws.encryptionsdk.MasterKeyProvider;
 import com.amazonaws.encryptionsdk.caching.CachingCryptoMaterialsManager;
 import com.amazonaws.encryptionsdk.caching.CryptoMaterialsCache;
 import com.amazonaws.encryptionsdk.caching.LocalCryptoMaterialsCache;
-import com.amazonaws.encryptionsdk.kms.KmsMasterKey;
-import com.amazonaws.encryptionsdk.kms.KmsMasterKeyProvider;
-import com.amazonaws.encryptionsdk.CommitmentPolicy;
+import com.amazonaws.encryptionsdk.kmssdkv2.KmsMasterKey;
+import com.amazonaws.encryptionsdk.kmssdkv2.KmsMasterKeyProvider;
 
 /**
  * <p>

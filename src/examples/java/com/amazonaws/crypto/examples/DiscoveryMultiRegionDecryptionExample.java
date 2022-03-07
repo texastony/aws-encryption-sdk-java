@@ -7,13 +7,14 @@ import com.amazonaws.encryptionsdk.AwsCrypto;
 import com.amazonaws.encryptionsdk.CommitmentPolicy;
 import com.amazonaws.encryptionsdk.CryptoResult;
 import com.amazonaws.encryptionsdk.kms.DiscoveryFilter;
-import com.amazonaws.encryptionsdk.kms.AwsKmsMrkAwareMasterKey;
-import com.amazonaws.encryptionsdk.kms.AwsKmsMrkAwareMasterKeyProvider;
+import com.amazonaws.encryptionsdk.kmssdkv2.AwsKmsMrkAwareMasterKey;
+import com.amazonaws.encryptionsdk.kmssdkv2.AwsKmsMrkAwareMasterKeyProvider;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import software.amazon.awssdk.regions.Region;
 
 /**
  * <p>
@@ -39,7 +40,7 @@ public class DiscoveryMultiRegionDecryptionExample {
         final String keyName = args[0];
         final String partition = args[1];
         final String accountId = args[2];
-        final String discoveryMrkRegion = args[3];
+        final Region discoveryMrkRegion = Region.of(args[3]);
 
         encryptAndDecrypt(keyName, partition, accountId, discoveryMrkRegion);
     }
@@ -48,7 +49,7 @@ public class DiscoveryMultiRegionDecryptionExample {
         final String keyName,
         final String partition,
         final String accountId,
-        final String discoveryMrkRegion
+        final Region discoveryMrkRegion
     ) {
         // 1. Instantiate the SDK
         // This builds the AwsCrypto client with
@@ -113,7 +114,7 @@ public class DiscoveryMultiRegionDecryptionExample {
         // it is limited to the Region configured for the AWS SDK.
         final AwsKmsMrkAwareMasterKeyProvider decryptingKeyProvider = AwsKmsMrkAwareMasterKeyProvider
                 .builder()
-                .withDiscoveryMrkRegion(discoveryMrkRegion)
+                .discoveryMrkRegion(discoveryMrkRegion)
                 .buildDiscovery(discoveryFilter);
 
         // 7. Decrypt the data

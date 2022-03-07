@@ -5,6 +5,7 @@ package com.amazonaws.crypto.examples;
 
 import com.amazonaws.encryptionsdk.kms.KMSTestFixtures;
 import org.junit.Test;
+import software.amazon.awssdk.regions.Region;
 
 public class DiscoveryMultiRegionDecryptionExampleTest {
 
@@ -14,6 +15,6 @@ public class DiscoveryMultiRegionDecryptionExampleTest {
         KMSTestFixtures.US_EAST_1_MULTI_REGION_KEY_ID,
         KMSTestFixtures.PARTITION,
         KMSTestFixtures.ACCOUNT_ID,
-        KMSTestFixtures.US_WEST_2);
+        Region.US_WEST_2);
   }
 }

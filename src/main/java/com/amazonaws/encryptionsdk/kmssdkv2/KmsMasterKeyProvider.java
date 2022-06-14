@@ -89,6 +89,9 @@ public class KmsMasterKeyProvider extends MasterKeyProvider<KmsMasterKey> implem
      * #builderSupplier(Supplier)}; if you try to use these in combination, an {@link
      * IllegalStateException} will be thrown.
      *
+     * <p>Note: The AWS Encryption SDK for Java does not support the {@code KmsAsyncClient}
+     * interface.
+     *
      * @param regionalClientSupplier
      * @return
      */
@@ -109,6 +112,9 @@ public class KmsMasterKeyProvider extends MasterKeyProvider<KmsMasterKey> implem
      * <p>Trying to use this method in combination with {@link
      * #customRegionalClientSupplier(RegionalClientSupplier)} will cause an {@link
      * IllegalStateException} to be thrown.
+     *
+     * <p>Note: The AWS Encryption SDK for Java does not support the {@code KmsAsyncClient}
+     * interface.
      *
      * @param supplier Should return a new {@link KmsClientBuilder} on each invocation.
      * @return

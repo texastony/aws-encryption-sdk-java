@@ -643,6 +643,7 @@ public class DecryptionHandlerTest {
     decryptionHandler.processBytes(header, 0, header.length, plaintext, 0);
   }
 
+  @Test
   public void validSignatureAcrossMultipleBlocks() {
     byte[] ciphertext =
         getTestMessage(

@@ -7,7 +7,7 @@ target/
 .idea/
 *.iml
 /.history
-/.DS_Store
+**/*/.DS_Store
 /specification_compliance_report.html
 
 ## semantic-release

@@ -17,7 +17,8 @@ public final class KMSTestFixtures {
    * in the world can decrypt data encrypted using them).
    */
   public static final String US_WEST_2_KEY_ID =
-      "arn:aws:kms:us-west-2:658956600833:key/b3537ef1-d8dc-4780-9f5a-55776cbb2f7f";
+          "arn:aws:kms:us-west-2:827585335069:key/348babbd-3010-4471-b5d7-21588d4e25ea";
+      //"arn:aws:kms:us-west-2:658956600833:key/b3537ef1-d8dc-4780-9f5a-55776cbb2f7f";
 
   public static final String EU_CENTRAL_1_KEY_ID =
       "arn:aws:kms:eu-central-1:658956600833:key/75414c93-5285-4b57-99c9-30c1cf0a22c2";

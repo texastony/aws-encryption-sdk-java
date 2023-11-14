@@ -1,15 +1,30 @@
 package com.amazonaws.crypto.examples;
 
 import com.amazonaws.encryptionsdk.kms.KMSTestFixtures;
+import com.amazonaws.regions.Regions;
 import org.junit.Test;
-import software.amazon.awssdk.regions.Region;
 
 public class CustomHeaderExampleTest {
 
   @Test
-  public void testEncryptAndDecrypt() {
-    CustomHeaderExample.encryptAndDecrypt(
+  public void testEncryptAndDecryptV2() {
+    CustomHeaderExampleSdkV2.encryptAndDecrypt(
+            KMSTestFixtures.US_WEST_2_KEY_ID
+    );
+  }
+
+  @Test
+  public void testEncryptAndDecryptV1Static() {
+    CustomHeaderExampleSdkV1.encryptAndDecryptStaticHeaderValues(
             KMSTestFixtures.US_WEST_2_KEY_ID,
-            Region.US_WEST_2);
+            Regions.US_WEST_2
+    );
+  }
+
+  @Test
+  public void testEncryptAndDecryptV1Dynamic() {
+    CustomHeaderExampleSdkV1.encryptAndDecryptHeaderDynamicOnEncryptionContext(
+            KMSTestFixtures.US_WEST_2_KEY_ID
+    );
   }
 }

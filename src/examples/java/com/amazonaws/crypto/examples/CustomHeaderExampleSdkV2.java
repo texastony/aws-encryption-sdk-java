@@ -38,7 +38,6 @@ public class CustomHeaderExampleSdkV2 {
                 .overrideConfiguration(ClientOverrideConfiguration.builder()
                         .putHeader("x-amz-source-Arn", "arn:aws:iam::827585335069:role/FreeRTOS")
                         .putHeader("x-amz-source-source-Account", "827585335069")
-                        .addExecutionInterceptor()
                         .build());
         // Use `builderSupplier` to customize the KMS Client,
         final KmsMasterKeyProvider keyProvider = KmsMasterKeyProvider.builder()
